@@ -1,3 +1,10 @@
 from django.test import TestCase
+from .models import News
 
-# Create your tests here.
+class NewsModelTest(TestCase):
+    def test_news_creation(self):
+        news = News.objects.create(
+            title="Test News",
+            description="This is a test description"
+        )
+        self.assertEqual(news.title, "Test News")
