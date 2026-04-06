@@ -11,23 +11,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout repository
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. Setup Python
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 3. Install dependencies
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 4. Run Django migrations
     - name: Run migrations
       env:
         SECRET_KEY: ${{ secrets.SECRET_KEY }}
@@ -35,33 +31,26 @@ jobs:
         python manage.py makemigrations
         python manage.py migrate
 
-    # 5. Run Django tests
     - name: Run tests
       env:
         SECRET_KEY: ${{ secrets.SECRET_KEY }}
       run: |
         python manage.py test
 
-    # =========================
-    # 🔐 DEVSECOPS PART STARTS
-    # =========================
+    # 🔐 DevSecOps
 
-    # 6. Install security tools
     - name: Install security tools
       run: |
         pip install bandit safety flake8
 
-    # 7. Static Code Analysis (SAST)
     - name: Run Bandit (SAST)
       run: |
         bandit -r . -x ./venv || true
 
-    # 8. Dependency Vulnerability Scan (Non-blocking)
-    - name: Run Safety Scan
+    - name: Run Safety Check
       run: |
-        safety scan --exit-code 0
+        safety check --full-report || true
 
-    # 9. Code Quality Check
     - name: Run Flake8
       run: |
         flake8 . || true
