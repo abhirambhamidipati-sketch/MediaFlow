@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
+from .models import UserProfile
+
 
 class IsOwnerOrReadOnly(BasePermission):
     """
@@ -15,3 +17,30 @@ class IsOwnerOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return obj.author == request.user
+
+
+class IsVerifiedContributor(BasePermission):
+    """
+    View-level permission: restricts POST (create) to users whose profile has
+    role='contributor' AND verification_status='approved'.
+
+    Safe methods (GET, HEAD, OPTIONS) bypass this check — listing/reading news
+    remains unrestricted by role. PUT/PATCH/DELETE on the detail view are
+    governed by IsOwnerOrReadOnly, not this class.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        if request.method == 'POST':
+            if not request.user or not request.user.is_authenticated:
+                return False
+            try:
+                profile = request.user.profile
+            except UserProfile.DoesNotExist:
+                return False
+            return (
+                profile.role == 'contributor'
+                and profile.verification_status == 'approved'
+            )
+        return True

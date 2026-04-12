@@ -3,14 +3,14 @@ from rest_framework import filters, generics
 from rest_framework.permissions import IsAuthenticated
 
 from .models import News
-from .permissions import IsOwnerOrReadOnly
+from .permissions import IsOwnerOrReadOnly, IsVerifiedContributor
 from .serializers import NewsSerializer
 
 
 class NewsListCreateAPIView(generics.ListCreateAPIView):
     queryset = News.objects.all().order_by('-created_at')
     serializer_class = NewsSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsVerifiedContributor]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'author']
     search_fields = ['title', 'description']

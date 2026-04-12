@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from .models import News
+from .models import News, UserProfile
 
 
 class NewsModelTest(TestCase):
@@ -27,6 +27,11 @@ class NewsAPITest(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(username='testuser', password='testpass123')
         self.other_user = User.objects.create_user(username='otheruser', password='testpass456')
+        # Upgrade testuser to verified contributor so existing POST tests still pass.
+        profile = self.user.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'approved'
+        profile.save()
         self.client.force_authenticate(user=self.user)
         # News owned by self.user so ownership tests are correct.
         # Created directly via ORM — bypasses serializer validation intentionally.
@@ -209,3 +214,72 @@ class NewsAPITest(TestCase):
         response = self.client.get('/api/news/?search=nonexistentkeyword')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
+
+
+class UserProfileTest(TestCase):
+    """Tests for role-based user system and verification-gated news creation."""
+
+    # ------------------------------------------------------------------ #
+    # Signal / profile auto-creation                                       #
+    # ------------------------------------------------------------------ #
+
+    def test_new_user_profile_auto_created(self):
+        user = User.objects.create_user(username='newuser', password='testpass123')
+        self.assertTrue(hasattr(user, 'profile'))
+        self.assertIsInstance(user.profile, UserProfile)
+
+    def test_default_role_is_viewer(self):
+        user = User.objects.create_user(username='vieweruser', password='testpass123')
+        self.assertEqual(user.profile.role, 'viewer')
+
+    # ------------------------------------------------------------------ #
+    # Role / verification gates on POST /api/news/                         #
+    # ------------------------------------------------------------------ #
+
+    def test_viewer_cannot_create_news(self):
+        """Default role=viewer → POST /api/news/ must return 403."""
+        client = APIClient()
+        viewer = User.objects.create_user(username='vieweronly', password='testpass123')
+        # profile auto-created with role='viewer'
+        client.force_authenticate(user=viewer)
+        data = {
+            "title": "Viewer Article",
+            "description": "This should be rejected by IsVerifiedContributor",
+            "category": "Technology",
+        }
+        response = client.post('/api/news/', data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_contributor_not_verified_cannot_create(self):
+        """role=contributor but verification_status=pending → POST must return 403."""
+        client = APIClient()
+        unverified = User.objects.create_user(username='unverified', password='testpass123')
+        profile = unverified.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'pending'
+        profile.save()
+        client.force_authenticate(user=unverified)
+        data = {
+            "title": "Unverified Article",
+            "description": "This should also be rejected",
+            "category": "Technology",
+        }
+        response = client.post('/api/news/', data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_verified_contributor_can_create(self):
+        """role=contributor AND verification_status=approved → POST must return 201."""
+        client = APIClient()
+        contributor = User.objects.create_user(username='verified', password='testpass123')
+        profile = contributor.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'approved'
+        profile.save()
+        client.force_authenticate(user=contributor)
+        data = {
+            "title": "Verified Article",
+            "description": "This should be allowed through the gate",
+            "category": "Technology",
+        }
+        response = client.post('/api/news/', data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
