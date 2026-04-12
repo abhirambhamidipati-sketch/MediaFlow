@@ -1,3 +1,6 @@
+import os
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework import status
@@ -283,3 +286,93 @@ class UserProfileTest(TestCase):
         }
         response = client.post('/api/news/', data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Shared mock payload — represents one article returned by NewsAPI
+# ---------------------------------------------------------------------------
+_MOCK_EXTERNAL = [
+    {
+        'title': 'External Headline',
+        'description': 'An article fetched from NewsAPI',
+        'source': 'Mock News Source',
+        'url': 'https://example.com/news/1',
+        'image': 'https://example.com/img/1.jpg',
+        'is_external': True,
+    }
+]
+
+
+class ExternalNewsTest(TestCase):
+    """Tests for the external news aggregation feature (Phase 4)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='extuser', password='testpass123')
+        profile = self.user.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'approved'
+        profile.save()
+        self.client.force_authenticate(user=self.user)
+        # One internal article that exists in the DB throughout these tests.
+        self.news = News.objects.create(
+            title="Internal Article",
+            description="An internal article stored in the database",
+            author=self.user,
+            category="Technology",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Service layer                                                         #
+    # ------------------------------------------------------------------ #
+
+    def test_external_fetch_returns_empty_without_api_key(self):
+        """fetch_external_news() returns [] when NEWS_API_KEY is not set."""
+        from news.services.external_news import fetch_external_news as _fetch
+        with patch.dict(os.environ, {'NEWS_API_KEY': ''}, clear=False):
+            result = _fetch()
+        self.assertEqual(result, [])
+
+    # ------------------------------------------------------------------ #
+    # Combined feed — view layer                                            #
+    # ------------------------------------------------------------------ #
+
+    def test_combined_feed_includes_both_sources(self):
+        """GET /api/news/ merges internal DB articles with external API articles."""
+        with patch('news.views.fetch_external_news', return_value=_MOCK_EXTERNAL):
+            response = self.client.get('/api/news/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)  # 1 internal + 1 external
+        is_external_flags = [r['is_external'] for r in response.data['results']]
+        self.assertIn(True, is_external_flags)   # external article present
+        self.assertIn(False, is_external_flags)  # internal article present
+
+    def test_combined_feed_resilient_to_external_failure(self):
+        """GET /api/news/ still returns internal news when external fetch returns []."""
+        with patch('news.views.fetch_external_news', return_value=[]):
+            response = self.client.get('/api/news/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertFalse(response.data['results'][0]['is_external'])
+
+    # ------------------------------------------------------------------ #
+    # Source filtering                                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_source_external_returns_only_external(self):
+        """?source=external returns only external articles (no DB query)."""
+        with patch('news.views.fetch_external_news', return_value=_MOCK_EXTERNAL):
+            response = self.client.get('/api/news/?source=external')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertTrue(response.data['results'][0]['is_external'])
+
+    def test_source_internal_returns_only_internal(self):
+        """?source=internal returns only DB news in standard paginated format."""
+        response = self.client.get('/api/news/?source=internal')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('count', response.data)
+        self.assertIn('results', response.data)
+        self.assertEqual(response.data['count'], 1)
+        # Standard serializer output — no is_external key on internal-only path
+        self.assertNotIn('is_external', response.data['results'][0])
