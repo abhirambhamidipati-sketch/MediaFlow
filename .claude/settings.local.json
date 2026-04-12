@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python manage.py makemigrations news --name=\"author_fk\")"
+      "Bash(python manage.py makemigrations news --name=\"author_fk\")",
+      "Bash(python -c \"import requests; print\\(requests.__version__\\)\")"
     ]
   }
 }
