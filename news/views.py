@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db.models import Count, F, Sum
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, status
@@ -12,6 +13,15 @@ from .models import Bookmark, Comment, Like, News
 from .permissions import IsOwnerOrReadOnly, IsVerifiedContributor
 from .serializers import CommentSerializer, NewsSerializer
 from .services.external_news import fetch_external_news
+
+# ---------------------------------------------------------------------------
+# Cache configuration
+# ---------------------------------------------------------------------------
+_TRENDING_CACHE_KEY = 'trending_news'
+_TRENDING_CACHE_TIMEOUT = 120   # 2 minutes
+
+_STATS_CACHE_KEY = 'global_stats'
+_STATS_CACHE_TIMEOUT = 60       # 1 minute
 
 
 class NewsListCreateAPIView(generics.ListCreateAPIView):
@@ -66,6 +76,9 @@ class NewsListCreateAPIView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+        # New article changes both trending order and global news count.
+        cache.delete(_TRENDING_CACHE_KEY)
+        cache.delete(_STATS_CACHE_KEY)
 
 
 class NewsRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -214,6 +227,14 @@ class NewsTrendingView(generics.ListAPIView):
             .order_by('-views_count', '-likes_ann')[:10]
         )
 
+    def list(self, request, *args, **kwargs):
+        cached = cache.get(_TRENDING_CACHE_KEY)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(_TRENDING_CACHE_KEY, response.data, _TRENDING_CACHE_TIMEOUT)
+        return response
+
 
 # ---------------------------------------------------------------------------
 # Analytics — contributor stats
@@ -262,9 +283,14 @@ class GlobalStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        cached = cache.get(_STATS_CACHE_KEY)
+        if cached is not None:
+            return Response(cached)
         User = get_user_model()
-        return Response({
+        data = {
             'total_news': News.objects.count(),
             'total_users': User.objects.count(),
             'total_comments': Comment.objects.count(),
-        })
+        }
+        cache.set(_STATS_CACHE_KEY, data, _STATS_CACHE_TIMEOUT)
+        return Response(data)
