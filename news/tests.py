@@ -6,7 +6,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from .models import Comment, News, UserProfile
+from .models import Comment, Like, News, UserProfile
 
 
 class NewsModelTest(TestCase):
@@ -510,3 +510,149 @@ class EngagementTest(TestCase):
         self.assertEqual(response.data['comments_count'], 1)
         self.assertTrue(response.data['is_liked'])
         self.assertFalse(response.data['is_bookmarked'])
+
+
+class AnalyticsTest(TestCase):
+    """Tests for the analytics system (Phase 6): view counts, trending, and stats."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='analyticsuser', password='testpass123')
+        self.other_user = User.objects.create_user(username='analyticsother', password='testpass123')
+        profile = self.user.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'approved'
+        profile.save()
+        self.client.force_authenticate(user=self.user)
+        self.news = News.objects.create(
+            title="Analytics Test Article",
+            description="Article used for analytics testing",
+            author=self.user,
+            category="Technology",
+        )
+
+    # ------------------------------------------------------------------ #
+    # views_count — serializer field                                        #
+    # ------------------------------------------------------------------ #
+
+    def test_news_detail_includes_views_count(self):
+        """GET /api/news/<pk>/ response includes views_count field."""
+        response = self.client.get(f'/api/news/{self.news.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('views_count', response.data)
+
+    # ------------------------------------------------------------------ #
+    # views_count — increment logic                                         #
+    # ------------------------------------------------------------------ #
+
+    def test_get_detail_increments_views_count(self):
+        """GET /api/news/<pk>/ increments views_count by exactly 1."""
+        self.client.get(f'/api/news/{self.news.id}/')
+        self.news.refresh_from_db()
+        self.assertEqual(self.news.views_count, 1)
+
+    def test_multiple_detail_views_accumulate(self):
+        """Three GET requests → views_count == 3."""
+        for _ in range(3):
+            self.client.get(f'/api/news/{self.news.id}/')
+        self.news.refresh_from_db()
+        self.assertEqual(self.news.views_count, 3)
+
+    def test_list_does_not_increment_views_count(self):
+        """GET /api/news/ (list) must NOT touch views_count."""
+        self.client.get('/api/news/')
+        self.news.refresh_from_db()
+        self.assertEqual(self.news.views_count, 0)
+
+    # ------------------------------------------------------------------ #
+    # Trending endpoint                                                     #
+    # ------------------------------------------------------------------ #
+
+    def test_trending_returns_200(self):
+        """GET /api/news/trending/ returns 200 with paginated structure."""
+        response = self.client.get('/api/news/trending/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('results', response.data)
+
+    def test_trending_orders_by_views_count_desc(self):
+        """Article with higher views_count appears first in trending results."""
+        low = News.objects.create(
+            title="Low Views Article",
+            description="Not the most popular article around",
+            author=self.user,
+            category="General",
+        )
+        high = News.objects.create(
+            title="High Views Article",
+            description="Very popular article with many views here",
+            author=self.user,
+            category="General",
+        )
+        News.objects.filter(pk=high.pk).update(views_count=50)
+        News.objects.filter(pk=low.pk).update(views_count=5)
+        News.objects.filter(pk=self.news.pk).update(views_count=0)
+
+        response = self.client.get('/api/news/trending/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [r['id'] for r in response.data['results']]
+        # high must appear before low
+        self.assertLess(ids.index(high.id), ids.index(low.id))
+
+    def test_trending_returns_at_most_10_results(self):
+        """Trending is capped at 10 articles even when the DB has more."""
+        for i in range(12):
+            News.objects.create(
+                title=f"Bulk Article {i:02d}",
+                description=f"Filler article number {i:02d} for trending cap test",
+                author=self.user,
+                category="General",
+            )
+        response = self.client.get('/api/news/trending/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Total items across all pages must be ≤ 10
+        self.assertLessEqual(response.data['count'], 10)
+
+    # ------------------------------------------------------------------ #
+    # Contributor stats                                                     #
+    # ------------------------------------------------------------------ #
+
+    def test_contributor_stats_returns_200_with_keys(self):
+        """GET /api/users/me/stats/ returns 200 with required keys."""
+        response = self.client.get('/api/users/me/stats/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for key in ('total_articles', 'total_views', 'total_likes'):
+            self.assertIn(key, response.data)
+
+    def test_contributor_stats_correct_totals(self):
+        """Stats reflect accurate total_articles, total_views, total_likes."""
+        News.objects.filter(pk=self.news.pk).update(views_count=7)
+        Like.objects.create(user=self.other_user, news=self.news)
+
+        response = self.client.get('/api/users/me/stats/')
+        self.assertEqual(response.data['total_articles'], 1)
+        self.assertEqual(response.data['total_views'], 7)
+        self.assertEqual(response.data['total_likes'], 1)
+
+    def test_contributor_stats_unauthenticated_returns_401(self):
+        """Unauthenticated request to /api/users/me/stats/ returns 401."""
+        response = APIClient().get('/api/users/me/stats/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    # ------------------------------------------------------------------ #
+    # Global stats                                                          #
+    # ------------------------------------------------------------------ #
+
+    def test_global_stats_returns_200_with_keys(self):
+        """GET /api/stats/ returns 200 with total_news, total_users, total_comments."""
+        response = self.client.get('/api/stats/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for key in ('total_news', 'total_users', 'total_comments'):
+            self.assertIn(key, response.data)
+
+    def test_global_stats_counts_are_accurate(self):
+        """Global stats reflect actual DB state at call time."""
+        Comment.objects.create(user=self.user, news=self.news, content='A global comment')
+        response = self.client.get('/api/stats/')
+        self.assertGreaterEqual(response.data['total_news'], 1)
+        self.assertGreaterEqual(response.data['total_users'], 2)   # analyticsuser + analyticsother
+        self.assertEqual(response.data['total_comments'], 1)

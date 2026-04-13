@@ -1,3 +1,5 @@
+from django.contrib.auth import get_user_model
+from django.db.models import Count, F, Sum
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, status
 from rest_framework.exceptions import PermissionDenied
@@ -70,6 +72,13 @@ class NewsRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = News.objects.all()
     serializer_class = NewsSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+
+    def retrieve(self, request, *args, **kwargs):
+        # Increment views atomically using F() — prevents race conditions.
+        # .update() runs a single SQL UPDATE; the fresh SELECT below picks up
+        # the new value automatically.
+        News.objects.filter(pk=kwargs['pk']).update(views_count=F('views_count') + 1)
+        return super().retrieve(request, *args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -178,3 +187,84 @@ class CommentDestroyView(generics.DestroyAPIView):
         if comment.user != self.request.user:
             raise PermissionDenied("You can only delete your own comments.")
         return comment
+
+
+# ---------------------------------------------------------------------------
+# Analytics — trending feed
+# ---------------------------------------------------------------------------
+
+class NewsTrendingView(generics.ListAPIView):
+    """
+    GET /api/news/trending/
+
+    Returns the top-10 internal articles ordered by:
+      1. views_count DESC  (primary)
+      2. likes_count DESC  (secondary — via annotation to avoid N+1)
+
+    External articles have no DB records and are excluded by design.
+    Pagination applies (inherits PAGE_SIZE from settings).
+    """
+    serializer_class = NewsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            News.objects
+            .annotate(likes_ann=Count('likes'))
+            .order_by('-views_count', '-likes_ann')[:10]
+        )
+
+
+# ---------------------------------------------------------------------------
+# Analytics — contributor stats
+# ---------------------------------------------------------------------------
+
+class ContributorStatsView(APIView):
+    """
+    GET /api/users/me/stats/
+
+    Returns aggregated stats for the authenticated user's articles:
+      {
+        "total_articles": <int>,
+        "total_views":    <int>,
+        "total_likes":    <int>
+      }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_news = News.objects.filter(author=request.user)
+        total_articles = user_news.count()
+        total_views = user_news.aggregate(total=Sum('views_count'))['total'] or 0
+        total_likes = Like.objects.filter(news__author=request.user).count()
+        return Response({
+            'total_articles': total_articles,
+            'total_views': total_views,
+            'total_likes': total_likes,
+        })
+
+
+# ---------------------------------------------------------------------------
+# Analytics — global platform stats
+# ---------------------------------------------------------------------------
+
+class GlobalStatsView(APIView):
+    """
+    GET /api/stats/
+
+    Returns platform-wide counts:
+      {
+        "total_news":     <int>,
+        "total_users":    <int>,
+        "total_comments": <int>
+      }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        User = get_user_model()
+        return Response({
+            'total_news': News.objects.count(),
+            'total_users': User.objects.count(),
+            'total_comments': Comment.objects.count(),
+        })

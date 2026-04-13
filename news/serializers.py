@@ -16,7 +16,7 @@ class NewsSerializer(serializers.ModelSerializer):
     class Meta:
         model = News
         fields = '__all__'
-        read_only_fields = ['author']
+        read_only_fields = ['author', 'views_count']
 
     # ------------------------------------------------------------------
     # Engagement method fields
