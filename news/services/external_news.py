@@ -17,11 +17,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from django.core.cache import cache
+
 logger = logging.getLogger(__name__)
 
 _NEWS_API_BASE = 'https://newsapi.org/v2/top-headlines'
 _TIMEOUT = 5          # seconds — keeps latency bounded
 _PAGE_SIZE = 10       # articles per fetch
+_CACHE_KEY = 'external_news'
+_CACHE_TIMEOUT = 300  # 5 minutes
 
 
 def _get_raw(url: str) -> dict:
@@ -52,11 +56,19 @@ def fetch_external_news() -> list:
     Returns [] on any failure (no key configured, network error, bad
     API status, JSON decode error, etc.) so callers never need to guard
     against exceptions.
+
+    Successful responses are cached for ``_CACHE_TIMEOUT`` seconds.
+    Failed / empty results are never cached so the next call retries.
     """
+    # --- cache hit ---
+    cached = cache.get(_CACHE_KEY)
+    if cached is not None:
+        return cached
+
     api_key = os.getenv('NEWS_API_KEY', '').strip()
     if not api_key:
         logger.debug('NEWS_API_KEY not configured — skipping external news fetch')
-        return []
+        return []                                  # do NOT cache — no key
 
     params = urllib.parse.urlencode({
         'apiKey': api_key,
@@ -69,14 +81,14 @@ def fetch_external_news() -> list:
         data = _get_raw(url)
     except urllib.error.URLError as exc:
         logger.warning('External news: network error — %s', exc)
-        return []
+        return []                                  # do NOT cache — network failure
     except Exception as exc:
         logger.warning('External news: unexpected error — %s', exc)
-        return []
+        return []                                  # do NOT cache — unexpected error
 
     if data.get('status') != 'ok':
         logger.warning('External news: API returned status=%s', data.get('status'))
-        return []
+        return []                                  # do NOT cache — bad API status
 
     articles = []
     for item in data.get('articles', []):
@@ -88,4 +100,7 @@ def fetch_external_news() -> list:
             'image':       item.get('urlToImage') or '',
             'is_external': True,
         })
+
+    # --- cache only on success ---
+    cache.set(_CACHE_KEY, articles, _CACHE_TIMEOUT)
     return articles

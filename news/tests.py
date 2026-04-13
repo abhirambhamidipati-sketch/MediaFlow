@@ -2,6 +2,7 @@ import os
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -307,6 +308,7 @@ class ExternalNewsTest(TestCase):
     """Tests for the external news aggregation feature (Phase 4)."""
 
     def setUp(self):
+        cache.clear()   # prevent stale external_news cache from affecting direct service calls
         self.client = APIClient()
         self.user = User.objects.create_user(username='extuser', password='testpass123')
         profile = self.user.profile
@@ -656,3 +658,161 @@ class AnalyticsTest(TestCase):
         self.assertGreaterEqual(response.data['total_news'], 1)
         self.assertGreaterEqual(response.data['total_users'], 2)   # analyticsuser + analyticsother
         self.assertEqual(response.data['total_comments'], 1)
+
+
+class CacheTest(TestCase):
+    """Tests for the caching system (Phase 7): external news, trending, and global stats."""
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='cacheuser', password='testpass123')
+        self.other_user = User.objects.create_user(username='cacheother', password='testpass123')
+        profile = self.user.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'approved'
+        profile.save()
+        self.client.force_authenticate(user=self.user)
+        self.news = News.objects.create(
+            title="Cache Test Article",
+            description="Article used for caching system tests",
+            author=self.user,
+            category="Technology",
+        )
+
+    def tearDown(self):
+        cache.clear()
+
+    # ------------------------------------------------------------------ #
+    # External news — service-layer cache                                  #
+    # ------------------------------------------------------------------ #
+
+    def test_external_news_cached_on_successful_fetch(self):
+        """_get_raw is called only once; the second call returns cached data."""
+        from news.services.external_news import fetch_external_news as _fetch
+        mock_response = {
+            'status': 'ok',
+            'articles': [{
+                'title': 'Cached News Headline',
+                'description': 'Description of the externally cached article',
+                'source': {'name': 'Test Source'},
+                'url': 'https://example.com/article',
+                'urlToImage': 'https://example.com/image.jpg',
+            }],
+        }
+        with patch('news.services.external_news._get_raw', return_value=mock_response) as mock_raw:
+            with patch.dict(os.environ, {'NEWS_API_KEY': 'testkey'}, clear=False):
+                result1 = _fetch()
+                result2 = _fetch()
+        mock_raw.assert_called_once()    # network hit exactly once
+        self.assertEqual(result1, result2)
+        self.assertEqual(len(result1), 1)
+        self.assertTrue(result1[0]['is_external'])
+
+    def test_external_news_not_cached_on_network_failure(self):
+        """Network errors are not cached; each failed call retries the API."""
+        from news.services.external_news import fetch_external_news as _fetch
+        with patch(
+            'news.services.external_news._get_raw',
+            side_effect=Exception('connection refused'),
+        ) as mock_raw:
+            with patch.dict(os.environ, {'NEWS_API_KEY': 'testkey'}, clear=False):
+                r1 = _fetch()
+                r2 = _fetch()
+        self.assertEqual(mock_raw.call_count, 2)   # retried — not cached
+        self.assertEqual(r1, [])
+        self.assertEqual(r2, [])
+
+    def test_external_news_not_cached_on_bad_api_status(self):
+        """A non-'ok' API status is not cached; each call hits the network."""
+        from news.services.external_news import fetch_external_news as _fetch
+        with patch(
+            'news.services.external_news._get_raw',
+            return_value={'status': 'error', 'message': 'apiKeyInvalid'},
+        ) as mock_raw:
+            with patch.dict(os.environ, {'NEWS_API_KEY': 'badkey'}, clear=False):
+                _fetch()
+                _fetch()
+        self.assertEqual(mock_raw.call_count, 2)   # both calls hit the API
+
+    # ------------------------------------------------------------------ #
+    # Trending cache — view layer                                          #
+    # ------------------------------------------------------------------ #
+
+    def test_trending_serves_cached_response(self):
+        """DB changes after the first trending request are hidden by the cache."""
+        response1 = self.client.get('/api/news/trending/')
+        count_before = response1.data['count']
+        # Create directly via ORM — does NOT trigger perform_create → no cache bust
+        News.objects.create(
+            title="Post-Cache Trending Article",
+            description="Should not appear in the still-warm cached response",
+            author=self.user,
+            category="General",
+        )
+        response2 = self.client.get('/api/news/trending/')
+        self.assertEqual(response2.data['count'], count_before)   # stale cache served
+
+    def test_trending_cache_invalidated_after_api_create(self):
+        """Creating an article via the API clears the trending cache."""
+        self.client.get('/api/news/trending/')   # warm the cache
+        # POST goes through perform_create() → cache.delete(_TRENDING_CACHE_KEY)
+        self.client.post('/api/news/', {
+            'title': 'Brand New Trending Article',
+            'description': 'Created via API to trigger cache invalidation',
+            'category': 'Technology',
+        })
+        response = self.client.get('/api/news/trending/')
+        self.assertGreaterEqual(response.data['count'], 2)   # fresh DB query
+
+    # ------------------------------------------------------------------ #
+    # Global stats cache — view layer                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_global_stats_serves_cached_response(self):
+        """DB changes after the first stats request are hidden by the cache."""
+        response1 = self.client.get('/api/stats/')
+        news_before = response1.data['total_news']
+        # Direct ORM create — no cache invalidation
+        News.objects.create(
+            title="Another Stats Article",
+            description="Should not appear in cached stats response here",
+            author=self.user,
+            category="General",
+        )
+        response2 = self.client.get('/api/stats/')
+        self.assertEqual(response2.data['total_news'], news_before)   # stale cache served
+
+    def test_global_stats_cache_invalidated_after_api_create(self):
+        """Creating an article via the API clears the global stats cache."""
+        self.client.get('/api/stats/')   # warm the cache
+        self.client.post('/api/news/', {
+            'title': 'Stats Invalidation Test Article',
+            'description': 'Created via API to clear the global stats cache',
+            'category': 'Technology',
+        })
+        response = self.client.get('/api/stats/')
+        self.assertGreaterEqual(response.data['total_news'], 2)   # fresh DB count
+
+    # ------------------------------------------------------------------ #
+    # Safety — caching must not affect existing correctness                #
+    # ------------------------------------------------------------------ #
+
+    def test_views_count_increments_are_unaffected_by_caching(self):
+        """view_count still increments correctly — detail endpoint is not cached."""
+        self.client.get(f'/api/news/{self.news.id}/')
+        self.news.refresh_from_db()
+        self.assertEqual(self.news.views_count, 1)
+
+    def test_contributor_stats_always_reflect_current_db(self):
+        """Contributor stats are never cached — each call reads fresh DB state."""
+        response1 = self.client.get('/api/users/me/stats/')
+        count_before = response1.data['total_articles']
+        News.objects.create(
+            title="Extra Article for User Stats",
+            description="Testing that contributor stats bypass the cache",
+            author=self.user,
+            category="General",
+        )
+        response2 = self.client.get('/api/users/me/stats/')
+        self.assertEqual(response2.data['total_articles'], count_before + 1)
