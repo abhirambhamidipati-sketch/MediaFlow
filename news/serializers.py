@@ -1,15 +1,48 @@
 from rest_framework import serializers
 
-from .models import News
+from .models import Comment, News
 
 VALID_CATEGORIES = ["Technology", "Sports", "Politics", "Entertainment", "General"]
 
 
 class NewsSerializer(serializers.ModelSerializer):
+    # --- engagement counts (read-only, computed from reverse relations) ---
+    likes_count = serializers.SerializerMethodField()
+    comments_count = serializers.SerializerMethodField()
+    # --- per-request flags (require request in serializer context) ---
+    is_liked = serializers.SerializerMethodField()
+    is_bookmarked = serializers.SerializerMethodField()
+
     class Meta:
         model = News
         fields = '__all__'
         read_only_fields = ['author']
+
+    # ------------------------------------------------------------------
+    # Engagement method fields
+    # ------------------------------------------------------------------
+
+    def get_likes_count(self, obj):
+        return obj.likes.count()
+
+    def get_comments_count(self, obj):
+        return obj.comments.count()
+
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(user=request.user).exists()
+        return False
+
+    def get_is_bookmarked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.bookmarks.filter(user=request.user).exists()
+        return False
+
+    # ------------------------------------------------------------------
+    # Field-level validation (unchanged)
+    # ------------------------------------------------------------------
 
     def validate_title(self, value):
         if len(value) < 5:
@@ -41,3 +74,19 @@ class NewsSerializer(serializers.ModelSerializer):
                 "Title and description cannot be identical."
             )
         return data
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Comment objects.
+
+    `username` is read-only and sourced from the related User.
+    `user` and `news` are set automatically in `perform_create` and are
+    never exposed as writable fields.
+    """
+    username = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'username', 'content', 'created_at']
+        read_only_fields = ['id', 'created_at']

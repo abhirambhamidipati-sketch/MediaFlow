@@ -6,7 +6,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from .models import News, UserProfile
+from .models import Comment, News, UserProfile
 
 
 class NewsModelTest(TestCase):
@@ -376,3 +376,137 @@ class ExternalNewsTest(TestCase):
         self.assertEqual(response.data['count'], 1)
         # Standard serializer output — no is_external key on internal-only path
         self.assertNotIn('is_external', response.data['results'][0])
+
+
+class EngagementTest(TestCase):
+    """Tests for the Like, Bookmark, and Comment engagement systems (Phase 5)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='enguser', password='testpass123')
+        self.other_user = User.objects.create_user(username='engother', password='testpass123')
+        # Make primary user a verified contributor (needed for any POST /api/news/ calls)
+        profile = self.user.profile
+        profile.role = 'contributor'
+        profile.verification_status = 'approved'
+        profile.save()
+        self.client.force_authenticate(user=self.user)
+        # One internal article — created via ORM to bypass serializer validation
+        self.news = News.objects.create(
+            title="Engagement Test Article",
+            description="Article used for engagement testing",
+            author=self.user,
+            category="Technology",
+        )
+
+    # ------------------------------------------------------------------ #
+    # Likes                                                                 #
+    # ------------------------------------------------------------------ #
+
+    def test_like_news_returns_201(self):
+        """First like on an article returns 201 with liked=True."""
+        response = self.client.post(f'/api/news/{self.news.id}/like/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['liked'])
+        self.assertEqual(response.data['likes_count'], 1)
+
+    def test_like_same_news_twice_toggles_off(self):
+        """Second POST to like endpoint removes the like (toggle off → 200)."""
+        self.client.post(f'/api/news/{self.news.id}/like/')
+        response = self.client.post(f'/api/news/{self.news.id}/like/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['liked'])
+        self.assertEqual(response.data['likes_count'], 0)
+
+    def test_unlike_via_delete_works(self):
+        """DELETE /api/news/<pk>/like/ removes an existing like."""
+        self.client.post(f'/api/news/{self.news.id}/like/')
+        response = self.client.delete(f'/api/news/{self.news.id}/like/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['liked'])
+
+    def test_like_nonexistent_news_returns_404(self):
+        """Liking a non-existent (or external) news ID returns 404."""
+        response = self.client.post('/api/news/99999/like/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # ------------------------------------------------------------------ #
+    # Bookmarks                                                             #
+    # ------------------------------------------------------------------ #
+
+    def test_bookmark_news_returns_201(self):
+        """First bookmark on an article returns 201 with bookmarked=True."""
+        response = self.client.post(f'/api/news/{self.news.id}/bookmark/')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['bookmarked'])
+
+    def test_bookmark_toggle_removes_bookmark(self):
+        """Second POST to bookmark endpoint removes it (toggle off → 200)."""
+        self.client.post(f'/api/news/{self.news.id}/bookmark/')
+        response = self.client.post(f'/api/news/{self.news.id}/bookmark/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['bookmarked'])
+
+    # ------------------------------------------------------------------ #
+    # Comments                                                              #
+    # ------------------------------------------------------------------ #
+
+    def test_add_comment_returns_201(self):
+        """Authenticated user can post a comment; returns 201 with content."""
+        response = self.client.post(
+            f'/api/news/{self.news.id}/comments/',
+            {'content': 'Great article!'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['content'], 'Great article!')
+        self.assertEqual(response.data['username'], self.user.username)
+
+    def test_fetch_comments_returns_200_with_count(self):
+        """GET /api/news/<pk>/comments/ returns paginated list of comments."""
+        Comment.objects.create(user=self.user, news=self.news, content='First comment')
+        response = self.client.get(f'/api/news/{self.news.id}/comments/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('count', response.data)
+        self.assertEqual(response.data['count'], 1)
+
+    def test_delete_own_comment_returns_204(self):
+        """Owner of a comment can delete it; returns 204."""
+        comment = Comment.objects.create(
+            user=self.user, news=self.news, content='Delete me'
+        )
+        response = self.client.delete(f'/api/comments/{comment.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_delete_others_comment_is_forbidden(self):
+        """Deleting another user's comment returns 403."""
+        other_client = APIClient()
+        other_client.force_authenticate(user=self.other_user)
+        comment = Comment.objects.create(
+            user=self.user, news=self.news, content='Not yours to delete'
+        )
+        response = other_client.delete(f'/api/comments/{comment.id}/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ------------------------------------------------------------------ #
+    # Engagement fields on news responses                                   #
+    # ------------------------------------------------------------------ #
+
+    def test_news_detail_includes_engagement_fields(self):
+        """GET /api/news/<pk>/ response includes all four engagement fields."""
+        response = self.client.get(f'/api/news/{self.news.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for field in ('likes_count', 'comments_count', 'is_liked', 'is_bookmarked'):
+            self.assertIn(field, response.data)
+
+    def test_engagement_counts_reflect_actions(self):
+        """likes_count and comments_count update after actual engagement."""
+        self.client.post(f'/api/news/{self.news.id}/like/')
+        self.client.post(
+            f'/api/news/{self.news.id}/comments/',
+            {'content': 'Counting this comment'},
+        )
+        response = self.client.get(f'/api/news/{self.news.id}/')
+        self.assertEqual(response.data['likes_count'], 1)
+        self.assertEqual(response.data['comments_count'], 1)
+        self.assertTrue(response.data['is_liked'])
+        self.assertFalse(response.data['is_bookmarked'])
