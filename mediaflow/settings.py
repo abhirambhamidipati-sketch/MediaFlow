@@ -163,6 +163,14 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+# --- Caching ---
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "mediaflow-cache",
+    }
+}
+
 # --- Security Hardening ---
 # X-Content-Type-Options header: prevents browsers from MIME-sniffing the response
 SECURE_CONTENT_TYPE_NOSNIFF = True
