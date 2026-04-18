@@ -3,6 +3,21 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from .models import UserProfile
 
 
+class IsAdminRole(BasePermission):
+    """
+    Allows access only to users whose UserProfile has ``role='admin'``.
+    Must be used alongside ``IsAuthenticated`` at the view level.
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        try:
+            return request.user.profile.role == 'admin'
+        except UserProfile.DoesNotExist:
+            return False
+
+
 class IsOwnerOrReadOnly(BasePermission):
     """
     Object-level permission: read access is granted to any authenticated user;

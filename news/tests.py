@@ -45,6 +45,12 @@ class NewsAPITest(TestCase):
             author=self.user,
             category="General",
         )
+        # Prevent real external API calls from inflating counts in these tests.
+        self._ext_patch = patch('news.views.fetch_external_news', return_value=[])
+        self._ext_patch.start()
+
+    def tearDown(self):
+        self._ext_patch.stop()
 
     # ------------------------------------------------------------------ #
     # Basic read / create                                                  #
@@ -658,6 +664,280 @@ class AnalyticsTest(TestCase):
         self.assertGreaterEqual(response.data['total_news'], 1)
         self.assertGreaterEqual(response.data['total_users'], 2)   # analyticsuser + analyticsother
         self.assertEqual(response.data['total_comments'], 1)
+
+
+# ---------------------------------------------------------------------------
+# Shared helper: create a valid in-memory JPEG for ImageField tests
+# ---------------------------------------------------------------------------
+
+def _make_image(filename='id.jpg'):
+    from io import BytesIO
+    from PIL import Image
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    buf = BytesIO()
+    Image.new('RGB', (10, 10), color=(255, 0, 0)).save(buf, format='JPEG')
+    buf.seek(0)
+    return SimpleUploadedFile(filename, buf.read(), content_type='image/jpeg')
+
+
+class WebSocketTest(TestCase):
+    """Tests for the real-time WebSocket notification system."""
+
+    # ------------------------------------------------------------------ #
+    # Connection                                                           #
+    # ------------------------------------------------------------------ #
+
+    def test_websocket_connection_accepted(self):
+        """ws/news/ accepts a plain WebSocket connection."""
+        from asgiref.sync import async_to_sync
+        from channels.testing.websocket import WebsocketCommunicator
+        from mediaflow.asgi import application
+
+        async def _run():
+            c = WebsocketCommunicator(application, "/ws/news/")
+            connected, _ = await c.connect()
+            await c.disconnect()
+            return connected
+
+        self.assertTrue(async_to_sync(_run)())
+
+    # ------------------------------------------------------------------ #
+    # Broadcast delivery                                                   #
+    # ------------------------------------------------------------------ #
+
+    def test_websocket_receives_new_news_broadcast(self):
+        """group_send to news_updates is delivered to connected clients."""
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from channels.testing.websocket import WebsocketCommunicator
+        from mediaflow.asgi import application
+
+        async def _run():
+            c = WebsocketCommunicator(application, "/ws/news/")
+            await c.connect()
+
+            layer = get_channel_layer()
+            await layer.group_send(
+                "news_updates",
+                {
+                    "type": "news.update",
+                    "data": {"type": "new_news", "title": "Live Headline", "id": 42},
+                },
+            )
+
+            data = await c.receive_json_from(timeout=3)
+            await c.disconnect()
+            return data
+
+        payload = async_to_sync(_run)()
+        self.assertEqual(payload["type"], "new_news")
+        self.assertEqual(payload["id"], 42)
+        self.assertEqual(payload["title"], "Live Headline")
+
+    def test_websocket_receives_new_comment_broadcast(self):
+        """new_comment events are forwarded to connected clients."""
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from channels.testing.websocket import WebsocketCommunicator
+        from mediaflow.asgi import application
+
+        async def _run():
+            c = WebsocketCommunicator(application, "/ws/news/")
+            await c.connect()
+
+            layer = get_channel_layer()
+            await layer.group_send(
+                "news_updates",
+                {
+                    "type": "news.update",
+                    "data": {"type": "new_comment", "news_id": 7},
+                },
+            )
+
+            data = await c.receive_json_from(timeout=3)
+            await c.disconnect()
+            return data
+
+        payload = async_to_sync(_run)()
+        self.assertEqual(payload["type"], "new_comment")
+        self.assertEqual(payload["news_id"], 7)
+
+
+class ContributorVerificationTest(TestCase):
+    """Tests for the contributor application and admin review workflow."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='applicant', password='testpass123')
+        self.admin_user = User.objects.create_user(username='admin_user', password='testpass123')
+        admin_profile = self.admin_user.profile
+        admin_profile.role = 'admin'
+        admin_profile.save()
+        self.client.force_authenticate(user=self.user)
+
+    # ------------------------------------------------------------------ #
+    # Application submission                                               #
+    # ------------------------------------------------------------------ #
+
+    def test_user_can_submit_application(self):
+        """Authenticated user submits an application; returns 201 with status=pending."""
+        response = self.client.post(
+            '/api/contributor/apply/',
+            {
+                'organization_name': 'Daily Tribune',
+                'role': 'journalist',
+                'id_document': _make_image(),
+            },
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'pending')
+
+    def test_unauthenticated_cannot_apply(self):
+        """Unauthenticated request returns 401."""
+        response = APIClient().post(
+            '/api/contributor/apply/',
+            {
+                'organization_name': 'Daily Tribune',
+                'role': 'journalist',
+                'id_document': _make_image(),
+            },
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_invalid_file_type_is_rejected(self):
+        """Uploading a non-image file returns 400."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        bad_file = SimpleUploadedFile('resume.pdf', b'%PDF fake', content_type='application/pdf')
+        response = self.client.post(
+            '/api/contributor/apply/',
+            {
+                'organization_name': 'Daily Tribune',
+                'role': 'journalist',
+                'id_document': bad_file,
+            },
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('id_document', response.data)
+
+    # ------------------------------------------------------------------ #
+    # Admin list view                                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_admin_can_list_applications(self):
+        """Admin gets 200 from GET /api/admin/applications/."""
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+        response = admin_client.get('/api/admin/applications/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_non_admin_cannot_list_applications(self):
+        """Non-admin user receives 403."""
+        response = self.client.get('/api/admin/applications/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ------------------------------------------------------------------ #
+    # Admin review — approve                                               #
+    # ------------------------------------------------------------------ #
+
+    def _create_app(self):
+        from .models import ContributorApplication
+        return ContributorApplication.objects.create(
+            user=self.user,
+            organization_name='Daily Tribune',
+            role='journalist',
+            id_document='contributor_docs/test.jpg',
+        )
+
+    def test_admin_can_approve_application(self):
+        """PATCH status=approved returns 200."""
+        app = self._create_app()
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+        response = admin_client.patch(
+            f'/api/admin/applications/{app.id}/',
+            {'status': 'approved'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'approved')
+
+    def test_approval_upgrades_user_profile(self):
+        """On approval the applicant becomes a verified contributor."""
+        app = self._create_app()
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+        admin_client.patch(
+            f'/api/admin/applications/{app.id}/',
+            {'status': 'approved'},
+            format='json',
+        )
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.role, 'contributor')
+        self.assertTrue(self.user.profile.is_verified)
+        self.assertEqual(self.user.profile.verification_status, 'approved')
+
+    def test_approved_user_can_create_news(self):
+        """After approval the applicant passes IsVerifiedContributor and can POST news."""
+        app = self._create_app()
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+        admin_client.patch(
+            f'/api/admin/applications/{app.id}/',
+            {'status': 'approved'},
+            format='json',
+        )
+        self.user.profile.refresh_from_db()  # clear ORM-cached profile so IsVerifiedContributor sees fresh DB state
+        response = self.client.post('/api/news/', {
+            'title': 'My First Article',
+            'description': 'Written after becoming a verified contributor',
+            'category': 'Technology',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # ------------------------------------------------------------------ #
+    # Admin review — reject                                                #
+    # ------------------------------------------------------------------ #
+
+    def test_admin_can_reject_application(self):
+        """PATCH status=rejected returns 200; role is not upgraded."""
+        app = self._create_app()
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+        response = admin_client.patch(
+            f'/api/admin/applications/{app.id}/',
+            {'status': 'rejected'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        app.refresh_from_db()
+        self.assertEqual(app.status, 'rejected')
+        self.user.profile.refresh_from_db()
+        self.assertNotEqual(self.user.profile.role, 'contributor')
+
+    def test_invalid_review_status_returns_400(self):
+        """Sending an unrecognised status value returns 400."""
+        app = self._create_app()
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=self.admin_user)
+        response = admin_client.patch(
+            f'/api/admin/applications/{app.id}/',
+            {'status': 'maybe'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_admin_cannot_review_applications(self):
+        """Non-admin PATCH returns 403."""
+        app = self._create_app()
+        response = self.client.patch(
+            f'/api/admin/applications/{app.id}/',
+            {'status': 'approved'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class CacheTest(TestCase):

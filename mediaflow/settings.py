@@ -45,8 +45,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'django_filters',
+    'channels',
     'news',
 ]
+
+ASGI_APPLICATION = "mediaflow.asgi.application"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -161,6 +164,13 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Production-ready News API with JWT Authentication',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# --- Channel Layers (InMemoryChannelLayer — no Redis required) ---
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
 }
 
 # --- Caching ---
