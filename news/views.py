@@ -9,6 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from rest_framework.permissions import AllowAny
+
 from .models import Bookmark, Comment, ContributorApplication, Like, News
 from .permissions import IsAdminRole, IsOwnerOrReadOnly, IsVerifiedContributor
 from .serializers import (
@@ -16,6 +18,8 @@ from .serializers import (
     CommentSerializer,
     ContributorApplicationSerializer,
     NewsSerializer,
+    UserProfileSerializer,
+    UserRegisterSerializer,
 )
 from .services.external_news import fetch_external_news
 
@@ -351,3 +355,55 @@ class ApplicationReviewView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# User registration & profile
+# ---------------------------------------------------------------------------
+
+class UserRegisterView(APIView):
+    """
+    POST /api/users/register/
+
+    Open endpoint — creates a new user account and returns the user id + username.
+    No authentication required.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserRegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {'id': user.id, 'username': user.username},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class UserMeView(APIView):
+    """
+    GET /api/users/me/
+
+    Returns the authenticated user's id, username, email, and profile fields.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user.profile)
+        return Response(serializer.data)
+
+
+class UserBookmarksView(generics.ListAPIView):
+    """
+    GET /api/users/me/bookmarks/
+
+    Returns news articles the authenticated user has bookmarked (paginated).
+    """
+    serializer_class = NewsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        bookmarked_ids = Bookmark.objects.filter(
+            user=self.request.user,
+        ).values_list('news_id', flat=True)
+        return News.objects.filter(id__in=bookmarked_ids).order_by('-created_at')

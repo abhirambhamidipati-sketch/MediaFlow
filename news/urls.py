@@ -13,6 +13,9 @@ from .views import (
     NewsListCreateAPIView,
     NewsRetrieveUpdateDestroyAPIView,
     NewsTrendingView,
+    UserBookmarksView,
+    UserMeView,
+    UserRegisterView,
 )
 
 urlpatterns = [
@@ -33,6 +36,11 @@ urlpatterns = [
     # --- Engagement: comments ---
     path('news/<int:pk>/comments/', NewsCommentListCreateView.as_view(), name='news-comments'),
     path('comments/<int:pk>/', CommentDestroyView.as_view(), name='comment-delete'),
+
+    # --- User registration & profile ---
+    path('users/register/', UserRegisterView.as_view(), name='user-register'),
+    path('users/me/', UserMeView.as_view(), name='user-me'),
+    path('users/me/bookmarks/', UserBookmarksView.as_view(), name='user-bookmarks'),
 
     # --- Analytics: per-user stats ---
     path('users/me/stats/', ContributorStatsView.as_view(), name='contributor-stats'),
