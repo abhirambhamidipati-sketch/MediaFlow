@@ -9,9 +9,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Bookmark, Comment, Like, News
-from .permissions import IsOwnerOrReadOnly, IsVerifiedContributor
-from .serializers import CommentSerializer, NewsSerializer
+from .models import Bookmark, Comment, ContributorApplication, Like, News
+from .permissions import IsAdminRole, IsOwnerOrReadOnly, IsVerifiedContributor
+from .serializers import (
+    ApplicationReviewSerializer,
+    CommentSerializer,
+    ContributorApplicationSerializer,
+    NewsSerializer,
+)
 from .services.external_news import fetch_external_news
 
 # ---------------------------------------------------------------------------
@@ -294,3 +299,55 @@ class GlobalStatsView(APIView):
         }
         cache.set(_STATS_CACHE_KEY, data, _STATS_CACHE_TIMEOUT)
         return Response(data)
+
+
+# ---------------------------------------------------------------------------
+# Contributor verification workflow
+# ---------------------------------------------------------------------------
+
+class ContributorApplyView(generics.CreateAPIView):
+    """
+    POST /api/contributor/apply/
+
+    Authenticated user submits a contributor application with an ID document.
+    The application is created with status='pending' for admin review.
+    """
+    serializer_class = ContributorApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ApplicationListView(generics.ListAPIView):
+    """
+    GET /api/admin/applications/
+
+    Admin lists all contributor applications (newest first).
+    Requires role='admin' on the requesting user's profile.
+    """
+    queryset = ContributorApplication.objects.select_related(
+        'user', 'reviewed_by',
+    ).order_by('-created_at')
+    serializer_class = ContributorApplicationSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+
+class ApplicationReviewView(generics.GenericAPIView):
+    """
+    PATCH /api/admin/applications/<pk>/
+
+    Admin approves or rejects a pending application.
+    On approval the applicant's UserProfile is automatically upgraded.
+    Requires role='admin' on the requesting user's profile.
+    """
+    queryset = ContributorApplication.objects.all()
+    serializer_class = ApplicationReviewSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def patch(self, request, *args, **kwargs):
+        application = self.get_object()
+        serializer = self.get_serializer(application, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

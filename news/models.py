@@ -109,3 +109,36 @@ class Comment(models.Model):
 
     def __str__(self):
         return f'{self.user.username} on "{self.news.title}"'
+
+
+class ContributorApplication(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='applications',
+    )
+    organization_name = models.CharField(max_length=255)
+    role = models.CharField(max_length=100)
+    id_document = models.ImageField(upload_to='contributor_docs/')
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_applications',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.user.username} — {self.status}'

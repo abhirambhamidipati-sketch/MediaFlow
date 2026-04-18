@@ -1,7 +1,10 @@
 from django.urls import path
 
 from .views import (
+    ApplicationListView,
+    ApplicationReviewView,
     CommentDestroyView,
+    ContributorApplyView,
     ContributorStatsView,
     GlobalStatsView,
     NewsBookmarkView,
@@ -36,4 +39,9 @@ urlpatterns = [
 
     # --- Analytics: global platform stats ---
     path('stats/', GlobalStatsView.as_view(), name='global-stats'),
+
+    # --- Contributor verification workflow ---
+    path('contributor/apply/', ContributorApplyView.as_view(), name='contributor-apply'),
+    path('admin/applications/', ApplicationListView.as_view(), name='application-list'),
+    path('admin/applications/<int:pk>/', ApplicationReviewView.as_view(), name='application-review'),
 ]
