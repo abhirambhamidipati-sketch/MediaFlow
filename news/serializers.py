@@ -1,6 +1,7 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Comment, ContributorApplication, News
+from .models import Comment, ContributorApplication, News, UserProfile
 
 VALID_CATEGORIES = ["Technology", "Sports", "Politics", "Entertainment", "General"]
 
@@ -12,6 +13,8 @@ class NewsSerializer(serializers.ModelSerializer):
     # --- per-request flags (require request in serializer context) ---
     is_liked = serializers.SerializerMethodField()
     is_bookmarked = serializers.SerializerMethodField()
+    # --- author display name (additive, read-only) ---
+    author_username = serializers.SerializerMethodField()
 
     class Meta:
         model = News
@@ -39,6 +42,11 @@ class NewsSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.bookmarks.filter(user=request.user).exists()
         return False
+
+    def get_author_username(self, obj):
+        if obj.author:
+            return obj.author.username
+        return None
 
     # ------------------------------------------------------------------
     # Field-level validation (unchanged)
@@ -154,3 +162,38 @@ class ApplicationReviewSerializer(serializers.ModelSerializer):
             profile.verification_status = 'approved'
             profile.save()
         return instance
+
+
+# ---------------------------------------------------------------------------
+# User registration & profile serializers
+# ---------------------------------------------------------------------------
+
+User = get_user_model()
+
+
+class UserRegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True, min_length=6)
+    email = serializers.EmailField(required=False, allow_blank=True)
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username is already taken.")
+        return value
+
+    def create(self, validated_data):
+        return User.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password'],
+            email=validated_data.get('email', ''),
+        )
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'username', 'email', 'role', 'is_verified', 'verification_status']
