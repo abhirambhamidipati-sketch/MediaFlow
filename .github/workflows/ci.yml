@@ -1,67 +1,64 @@
 name: Django CI
 
 on:
-push:
-branches: [ develop, main ]
-pull_request:
-branches: [ develop, main ]
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
 
 jobs:
-build-and-secure:
-runs-on: ubuntu-latest
+  build-and-secure:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-```
-steps:
-- name: Checkout code
-  uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-- name: Set up Python
-  uses: actions/setup-python@v5
-  with:
-    python-version: '3.11'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-- name: Install dependencies
-  run: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
-
-- name: Run migrations
-  env:
-    SECRET_KEY: ${{ secrets.SECRET_KEY }}
-  run: |
-    python manage.py makemigrations
-    python manage.py migrate
-
-- name: Run tests
-  env:
-    SECRET_KEY: ${{ secrets.SECRET_KEY }}
-  run: |
-    python manage.py test
-
-# 🔐 DevSecOps
-
-- name: Install security tools
-  run: |
-    pip install bandit safety flake8
-
-- name: Run Bandit (SAST)
-  run: |
-    bandit -r . -x ./venv || true
-
-- name: Run Safety Check
-  run: |
-    safety check --full-report || true
-
-- name: Run Flake8
-  run: |
-    flake8 . || true
-
-# 🚀 Azure Deployment (ONLY runs on main branch)
-
-- name: Deploy to Azure Web App
-  if: github.ref == 'refs/heads/main'
-  uses: azure/webapps-deploy@v2
-  with:
-    app-name: mediaflow-backend-abhiram
-    publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-```
+    - name: Run migrations
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      run: |
+        python manage.py makemigrations
+        python manage.py migrate
+    
+    - name: Run tests
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      run: |
+        python manage.py test
+    
+    # 🔐 DevSecOps
+    
+    - name: Install security tools
+      run: |
+        pip install bandit safety flake8
+    
+    - name: Run Bandit (SAST)
+      run: |
+        bandit -r . -x ./venv || true
+    
+    - name: Run Safety Check
+      run: |
+        safety check --full-report || true
+    
+    - name: Run Flake8
+      run: |
+        flake8 . || true
+    
+    # 🚀 Azure Deployment (ONLY runs on main branch)
+    
+    - name: Deploy to Azure Web App
+      if: github.ref == 'refs/heads/main'
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: mediaflow-backend-abhiram
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
