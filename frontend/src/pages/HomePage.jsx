@@ -32,6 +32,21 @@ function IconArrow() {
     </svg>
   )
 }
+function IconHeart() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>
+  )
+}
+function IconEye() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  )
+}
 
 /* ── Featured card ──────────────────────────────────────────────── */
 function FeaturedCard({ item }) {
@@ -39,25 +54,41 @@ function FeaturedCard({ item }) {
   const imgSrc = isExternal ? (item.image_url ?? item.image) : (item.image ? `/media/${item.image}` : null)
 
   const inner = (
-    <article className="group relative overflow-hidden rounded-2xl bg-[#111118] border border-white/[0.06]
-                        hover:border-blue-500/20 transition-all duration-300 cursor-pointer animate-fade-in">
+    <article className="group relative overflow-hidden rounded-2xl bg-[#111119] border border-white/[0.06]
+                        cursor-pointer animate-scale-fade
+                        transition-all duration-300 ease-out
+                        hover:border-blue-500/22 hover:-translate-y-1
+                        hover:shadow-[0_16px_48px_rgba(0,0,0,0.5),0_0_0_1px_rgba(59,130,246,0.08)]"
+                        style={{ willChange: 'transform' }}>
       {/* Large image */}
       {imgSrc && (
-        <div className="w-full aspect-[21/9] overflow-hidden bg-white/[0.02]">
+        <div className="w-full aspect-[21/9] overflow-hidden bg-white/[0.02] relative">
           <img
             src={imgSrc}
             alt={item.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            className="w-full h-full object-cover transition-transform duration-600 group-hover:scale-[1.03]"
             onError={(e) => { e.target.parentElement.style.display = 'none' }}
           />
+          {/* Gradient overlay — stronger on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent
+                          group-hover:from-black/45 transition-all duration-300" />
+          {/* Featured badge overlaid on image */}
+          <div className="absolute top-4 left-4">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest
+                             bg-blue-500/20 text-blue-300 border border-blue-500/30 backdrop-blur-sm">
+              Featured
+            </span>
+          </div>
         </div>
       )}
       <div className="p-6 sm:p-8">
         {/* Badges */}
         <div className="flex items-center gap-2 flex-wrap mb-4">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-blue-500/15 text-blue-400 border border-blue-500/25">
-            Featured
-          </span>
+          {!imgSrc && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-blue-500/15 text-blue-400 border border-blue-500/25">
+              Featured
+            </span>
+          )}
           {item.category && (
             <Badge className={`border text-[11px] ${categoryColor(item.category)}`}>{item.category}</Badge>
           )}
@@ -66,32 +97,32 @@ function FeaturedCard({ item }) {
               {item.source}
             </Badge>
           )}
-          <span className="text-white/30 text-xs ml-auto">{item.created_at ? timeAgo(item.created_at) : ''}</span>
+          <span className="text-white/25 text-xs ml-auto">{item.created_at ? timeAgo(item.created_at) : ''}</span>
         </div>
 
         {/* Title */}
-        <h2 className="text-xl sm:text-2xl font-bold text-white/90 leading-[1.3] group-hover:text-blue-300
-                       transition-colors duration-200 mb-3 line-clamp-2">
+        <h2 className="text-xl sm:text-[22px] font-bold text-white/90 leading-[1.3] group-hover:text-blue-300
+                       transition-colors duration-200 mb-3 line-clamp-2 tracking-tight">
           {item.title}
         </h2>
 
         {/* Description */}
         {item.description && (
-          <p className="text-white/45 text-sm leading-relaxed line-clamp-2 mb-5">{item.description}</p>
+          <p className="text-white/40 text-sm leading-relaxed line-clamp-2 mb-5">{item.description}</p>
         )}
 
         {/* Meta */}
-        <div className="flex items-center gap-4 text-xs text-white/35">
+        <div className="flex items-center gap-4 text-xs text-white/30 border-t border-white/[0.04] pt-4">
           {item.author_username && !isExternal && <span>{item.author_username}</span>}
           {!isExternal && (
-            <>
-              <span>♥ {item.likes_count ?? 0}</span>
-              <span>💬 {item.comments_count ?? 0}</span>
-              <span>👁 {item.views_count ?? 0}</span>
-            </>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1"><IconHeart /> {item.likes_count ?? 0}</span>
+              <span>{item.comments_count ?? 0} comments</span>
+              <span className="flex items-center gap-1"><IconEye /> {item.views_count ?? 0}</span>
+            </div>
           )}
           {isExternal && (
-            <span className="flex items-center gap-1.5 text-amber-400/70 font-medium ml-auto">
+            <span className="flex items-center gap-1.5 text-amber-400/65 font-medium ml-auto hover:text-amber-400 transition-colors">
               Read full article <IconArrow />
             </span>
           )}
@@ -176,7 +207,7 @@ export default function HomePage() {
   const showFeatured = !isFiltered && allItems.length > 0
 
   return (
-    <div className="flex gap-6 items-start">
+    <div className="flex gap-6 items-start bg-ambient min-h-screen -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-6 pt-6">
       {/* ── Main feed column ──────────────────────────────── */}
       <div className="flex-1 min-w-0 space-y-5">
 
@@ -267,11 +298,12 @@ export default function HomePage() {
           <div className="space-y-4">
             {showFeatured && <FeaturedCard item={allItems[0]} />}
             {allItems.slice(showFeatured ? 1 : 0).map((item, i) => (
-              <NewsCard
-                key={item.id ?? `ext-${i}`}
-                item={item}
-                queryKey={['news', category, source, debouncedSearch]}
-              />
+              <div key={item.id ?? `ext-${i}`} className="feed-item">
+                <NewsCard
+                  item={item}
+                  queryKey={['news', category, source, debouncedSearch]}
+                />
+              </div>
             ))}
             {/* Infinite scroll sentinel */}
             <div ref={loaderRef} className="h-10 flex items-center justify-center">
