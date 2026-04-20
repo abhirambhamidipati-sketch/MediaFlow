@@ -57,7 +57,7 @@ jobs:
     # 🚀 Azure Deployment (ONLY runs on main branch)
     
     - name: Deploy to Azure Web App
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
       uses: azure/webapps-deploy@v2
       with:
         app-name: mediaflow-backend-abhiram
