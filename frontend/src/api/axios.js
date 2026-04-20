@@ -18,7 +18,9 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       const isAuthEndpoint =
-        err.config.url?.includes('/token/') || err.config.url?.includes('/register/')
+        err.config.url?.includes('/token/') ||
+        err.config.url?.includes('/register/') ||
+        err.config.url?.includes('/auth/google/')
       if (!isAuthEndpoint) {
         localStorage.removeItem('access')
         localStorage.removeItem('refresh')

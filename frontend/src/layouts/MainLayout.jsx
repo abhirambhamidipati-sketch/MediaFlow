@@ -27,10 +27,10 @@ export function MainLayout() {
     }
   }, [qc, toast])
 
-  const { connected } = useWebSocket(handleWsMessage)
+  const { connected, connecting, retrying } = useWebSocket(handleWsMessage)
 
   return (
-    <WsContext.Provider value={{ connected, lastEvent }}>
+    <WsContext.Provider value={{ connected, connecting, retrying, lastEvent }}>
       <div className="min-h-screen bg-slate-950">
         {/* Subtle gradient orbs in background */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
@@ -38,7 +38,7 @@ export function MainLayout() {
           <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
         </div>
 
-        <Navbar wsConnected={connected} />
+        <Navbar wsConnected={connected} wsConnecting={connecting} wsRetrying={retrying} />
         <main className="max-w-6xl mx-auto px-4 py-6">
           <Outlet />
         </main>

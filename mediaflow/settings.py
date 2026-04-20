@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # must be first: replaces runserver with an ASGI server that supports WebSockets
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

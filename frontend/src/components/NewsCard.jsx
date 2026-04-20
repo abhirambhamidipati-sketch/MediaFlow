@@ -52,8 +52,13 @@ export function NewsCard({ item, queryKey }) {
         {isExternal && (
           <Badge className="border border-amber-500/30 bg-amber-500/10 text-amber-300">External</Badge>
         )}
+        {isExternal && item.source && (
+          <Badge className="border border-white/10 bg-white/5 text-white/50 uppercase tracking-wide text-[10px]">
+            {item.source}
+          </Badge>
+        )}
         <span className="text-white/40 text-xs ml-auto">
-          {item.created_at ? timeAgo(item.created_at) : item.source ?? ''}
+          {item.created_at ? timeAgo(item.created_at) : ''}
         </span>
       </div>
 
@@ -82,8 +87,10 @@ export function NewsCard({ item, queryKey }) {
         {item.author_username && (
           <span className="text-xs text-white/40 mr-auto">by {item.author_username}</span>
         )}
-        {item.source && !item.author_username && (
-          <span className="text-xs text-white/40 mr-auto">{item.source}</span>
+        {isExternal && (
+          <span className="text-xs text-amber-400/70 font-medium mr-auto">
+            Read full article →
+          </span>
         )}
 
         {!isExternal && user && (

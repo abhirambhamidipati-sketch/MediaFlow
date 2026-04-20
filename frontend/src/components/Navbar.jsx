@@ -3,7 +3,40 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { roleColor } from '../utils/formatters'
 
-export function Navbar({ wsConnected }) {
+function WsStatus({ connected, connecting, retrying }) {
+  if (connected) {
+    return (
+      <span className="hidden sm:flex items-center gap-1.5 text-xs text-green-400" title="Live updates active">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+        Live
+      </span>
+    )
+  }
+  if (connecting) {
+    return (
+      <span className="hidden sm:flex items-center gap-1.5 text-xs text-yellow-400/80" title="Establishing connection…">
+        <span className="w-1.5 h-1.5 rounded-full bg-yellow-400/80 animate-pulse" />
+        Connecting…
+      </span>
+    )
+  }
+  if (retrying) {
+    return (
+      <span className="hidden sm:flex items-center gap-1.5 text-xs text-orange-400/70" title="Reconnecting…">
+        <span className="w-1.5 h-1.5 rounded-full bg-orange-400/70" />
+        Disconnected (retrying)
+      </span>
+    )
+  }
+  return (
+    <span className="hidden sm:flex items-center gap-1.5 text-xs text-white/25" title="Offline">
+      <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+      Offline
+    </span>
+  )
+}
+
+export function Navbar({ wsConnected, wsConnecting, wsRetrying }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -43,13 +76,7 @@ export function Navbar({ wsConnected }) {
         <div className="flex items-center gap-3">
           {/* WS indicator */}
           {user && (
-            <span
-              className={`hidden sm:flex items-center gap-1.5 text-xs ${wsConnected ? 'text-green-400' : 'text-white/30'}`}
-              title={wsConnected ? 'Live updates active' : 'Connecting…'}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-white/20'}`} />
-              {wsConnected ? 'Live' : 'Offline'}
-            </span>
+            <WsStatus connected={wsConnected} connecting={wsConnecting} retrying={wsRetrying} />
           )}
 
           {user ? (
