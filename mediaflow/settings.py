@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # must be first: replaces runserver with an ASGI server that supports WebSockets
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,11 +46,15 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'django_filters',
+    'channels',
     'news',
 ]
 
+ASGI_APPLICATION = "mediaflow.asgi.application"
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -123,10 +128,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+# Where collectstatic writes files; served by WhiteNoise in production
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# WhiteNoise: compress + fingerprint static files for long-lived cache headers.
+# Uses the Django 4.2+ STORAGES dict (avoids STATICFILES_STORAGE deprecation warning).
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -163,6 +182,13 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+# --- Channel Layers (InMemoryChannelLayer — no Redis required) ---
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
+}
+
 # --- Caching ---
 CACHES = {
     "default": {
@@ -172,13 +198,29 @@ CACHES = {
 }
 
 # --- Security Hardening ---
-# X-Content-Type-Options header: prevents browsers from MIME-sniffing the response
 SECURE_CONTENT_TYPE_NOSNIFF = True
-# Prevent site from being framed (clickjacking protection)
 X_FRAME_OPTIONS = 'DENY'
-# Set to True in production when HTTPS is enforced
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SECURE = False
+
+_PROD = not DEBUG
+
+# Cookie security flags — safe to enable when DEBUG=False.
+# These only control the Secure attribute on cookies; they do not redirect.
+CSRF_COOKIE_SECURE    = _PROD
+SESSION_COOKIE_SECURE = _PROD
+
+# SECURE_SSL_REDIRECT must stay False in Django.
+# Azure App Service terminates TLS at the load balancer and issues its own
+# HTTP→HTTPS redirect before traffic reaches the Django process. If Django
+# also redirects, the test client (and local runserver) receives 301 on every
+# plain-HTTP request, breaking the entire test suite.
+# To enforce HTTPS on Azure: enable "HTTPS Only" in the App Service settings.
+SECURE_SSL_REDIRECT = False
+
+# HSTS: add the Strict-Transport-Security header so browsers remember to
+# use HTTPS directly. This is a response header only — it never redirects.
+SECURE_HSTS_SECONDS            = 31536000 if _PROD else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _PROD
+SECURE_HSTS_PRELOAD            = _PROD
 
 # --- Logging ---
 LOGGING = {

@@ -5,7 +5,8 @@
       "Bash(python -c \"import requests; print\\(requests.__version__\\)\")",
       "Bash(python manage.py makemigrations news --name engagement)",
       "Bash(python manage.py migrate)",
-      "Bash(python manage.py test news --verbosity=2)"
+      "Bash(python manage.py test news --verbosity=2)",
+      "Bash(npm run *)"
     ]
   }
 }

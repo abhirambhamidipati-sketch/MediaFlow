@@ -9,9 +9,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Bookmark, Comment, Like, News
-from .permissions import IsOwnerOrReadOnly, IsVerifiedContributor
-from .serializers import CommentSerializer, NewsSerializer
+from rest_framework.permissions import AllowAny
+
+from .models import Bookmark, Comment, ContributorApplication, Like, News
+from .permissions import IsAdminRole, IsOwnerOrReadOnly, IsVerifiedContributor
+from .serializers import (
+    ApplicationReviewSerializer,
+    CommentSerializer,
+    ContributorApplicationSerializer,
+    NewsSerializer,
+    UserProfileSerializer,
+    UserRegisterSerializer,
+)
 from .services.external_news import fetch_external_news
 
 # ---------------------------------------------------------------------------
@@ -294,3 +303,107 @@ class GlobalStatsView(APIView):
         }
         cache.set(_STATS_CACHE_KEY, data, _STATS_CACHE_TIMEOUT)
         return Response(data)
+
+
+# ---------------------------------------------------------------------------
+# Contributor verification workflow
+# ---------------------------------------------------------------------------
+
+class ContributorApplyView(generics.CreateAPIView):
+    """
+    POST /api/contributor/apply/
+
+    Authenticated user submits a contributor application with an ID document.
+    The application is created with status='pending' for admin review.
+    """
+    serializer_class = ContributorApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ApplicationListView(generics.ListAPIView):
+    """
+    GET /api/admin/applications/
+
+    Admin lists all contributor applications (newest first).
+    Requires role='admin' on the requesting user's profile.
+    """
+    queryset = ContributorApplication.objects.select_related(
+        'user', 'reviewed_by',
+    ).order_by('-created_at')
+    serializer_class = ContributorApplicationSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+
+class ApplicationReviewView(generics.GenericAPIView):
+    """
+    PATCH /api/admin/applications/<pk>/
+
+    Admin approves or rejects a pending application.
+    On approval the applicant's UserProfile is automatically upgraded.
+    Requires role='admin' on the requesting user's profile.
+    """
+    queryset = ContributorApplication.objects.all()
+    serializer_class = ApplicationReviewSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def patch(self, request, *args, **kwargs):
+        application = self.get_object()
+        serializer = self.get_serializer(application, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# User registration & profile
+# ---------------------------------------------------------------------------
+
+class UserRegisterView(APIView):
+    """
+    POST /api/users/register/
+
+    Open endpoint — creates a new user account and returns the user id + username.
+    No authentication required.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserRegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {'id': user.id, 'username': user.username},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class UserMeView(APIView):
+    """
+    GET /api/users/me/
+
+    Returns the authenticated user's id, username, email, and profile fields.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user.profile)
+        return Response(serializer.data)
+
+
+class UserBookmarksView(generics.ListAPIView):
+    """
+    GET /api/users/me/bookmarks/
+
+    Returns news articles the authenticated user has bookmarked (paginated).
+    """
+    serializer_class = NewsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        bookmarked_ids = Bookmark.objects.filter(
+            user=self.request.user,
+        ).values_list('news_id', flat=True)
+        return News.objects.filter(id__in=bookmarked_ids).order_by('-created_at')
