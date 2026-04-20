@@ -1,23 +1,25 @@
+import { createContext, useContext, useCallback, useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Navbar } from '../components/Navbar'
+import { Sidebar } from '../components/Sidebar'
+import { MobileHeader } from '../components/Navbar'
 import { ToastContainer } from '../components/ui/Toast'
 import { useToast } from '../hooks/useToast'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useContext, useCallback, useState } from 'react'
 
-const WsContext = createContext({ connected: false, lastEvent: null })
+const WsContext = createContext({ connected: false, connecting: false, retrying: false, lastEvent: null })
 export const useWsContext = () => useContext(WsContext)
 
 export function MainLayout() {
   const qc = useQueryClient()
   const { toasts, toast, dismiss } = useToast()
   const [lastEvent, setLastEvent] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleWsMessage = useCallback((data) => {
     setLastEvent(data)
     if (data.type === 'new_news') {
-      toast(`New article: "${data.title}"`, 'info', 5000)
+      toast(`"${data.title}" was just published`, 'info', 5000)
       qc.invalidateQueries({ queryKey: ['news'] })
       qc.invalidateQueries({ queryKey: ['trending'] })
     }
@@ -31,17 +33,24 @@ export function MainLayout() {
 
   return (
     <WsContext.Provider value={{ connected, connecting, retrying, lastEvent }}>
-      <div className="min-h-screen bg-slate-950">
-        {/* Subtle gradient orbs in background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+      <div className="min-h-screen bg-[#0B0B0F]">
+
+        {/* Left sidebar — fixed, desktop always visible, mobile toggle */}
+        <Sidebar
+          mobileOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+
+        {/* Mobile top bar */}
+        <MobileHeader onMenuOpen={() => setSidebarOpen(true)} />
+
+        {/* Content — offset by sidebar width on desktop */}
+        <div className="lg:pl-[232px] min-h-screen flex flex-col">
+          <main className="flex-1 w-full max-w-[1280px] mx-auto px-4 sm:px-6 py-6 pt-[60px] lg:pt-6">
+            <Outlet />
+          </main>
         </div>
 
-        <Navbar wsConnected={connected} wsConnecting={connecting} wsRetrying={retrying} />
-        <main className="max-w-6xl mx-auto px-4 py-6">
-          <Outlet />
-        </main>
         <ToastContainer toasts={toasts} onDismiss={dismiss} />
       </div>
     </WsContext.Provider>
