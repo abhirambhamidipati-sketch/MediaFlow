@@ -37,6 +37,13 @@ export function AuthProvider({ children }) {
     await login(username, password)
   }
 
+  const googleLogin = async (idToken) => {
+    const { data } = await api.post('/users/auth/google/', { token: idToken })
+    localStorage.setItem('access', data.access)
+    localStorage.setItem('refresh', data.refresh)
+    await fetchMe()
+  }
+
   const logout = useCallback(() => {
     localStorage.removeItem('access')
     localStorage.removeItem('refresh')
@@ -46,7 +53,7 @@ export function AuthProvider({ children }) {
   const refreshUser = useCallback(() => fetchMe(), [fetchMe])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

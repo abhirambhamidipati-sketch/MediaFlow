@@ -29,12 +29,30 @@ export function roleColor(role) {
 
 export function extractError(err) {
   const data = err?.response?.data
+  const status = err?.response?.status
+
   if (!data) return err?.message ?? 'Something went wrong'
-  if (typeof data === 'string') return data
-  const vals = Object.values(data)
-  if (vals.length) {
-    const first = vals[0]
-    return Array.isArray(first) ? first[0] : first
+
+  // Django returns HTML pages for 404/500 when DEBUG=False — never show raw HTML
+  if (typeof data === 'string') {
+    if (data.trimStart().startsWith('<')) {
+      if (status === 404) return 'Resource not found (404).'
+      if (status >= 500) return 'Server error. Please try again later.'
+      return 'Unexpected server response.'
+    }
+    return data
   }
+
+  if (typeof data === 'object') {
+    // DRF error: { "detail": "..." }
+    if (data.detail) return String(data.detail)
+    // DRF field errors: { "field": ["msg"] } or { "field": "msg" }
+    const vals = Object.values(data)
+    if (vals.length) {
+      const first = vals[0]
+      return Array.isArray(first) ? String(first[0]) : String(first)
+    }
+  }
+
   return 'Something went wrong'
 }

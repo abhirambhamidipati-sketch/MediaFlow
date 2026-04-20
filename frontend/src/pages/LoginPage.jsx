@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import { extractError } from '../utils/formatters'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, googleLogin } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', password: '' })
   const [error, setError] = useState('')
@@ -73,6 +74,28 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        <div className="relative flex items-center my-4">
+          <div className="flex-1 border-t border-white/10" />
+          <span className="px-3 text-white/30 text-xs">or</span>
+          <div className="flex-1 border-t border-white/10" />
+        </div>
+
+        <GoogleLoginButton
+          onSuccess={async (credential) => {
+            setError('')
+            setLoading(true)
+            try {
+              await googleLogin(credential)
+              navigate('/')
+            } catch (err) {
+              setError(extractError(err) || 'Google sign-in failed')
+            } finally {
+              setLoading(false)
+            }
+          }}
+          onError={(msg) => setError(msg || 'Google sign-in failed')}
+        />
 
         <p className="text-center text-white/40 text-sm mt-6">
           Don't have an account?{' '}

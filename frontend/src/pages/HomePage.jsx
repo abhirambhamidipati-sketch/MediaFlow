@@ -1,11 +1,61 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../api/axios'
 import { NewsCard } from '../components/NewsCard'
 import { TrendingSidebar } from '../components/TrendingSidebar'
 import { LiveBanner } from '../components/LiveBanner'
 import { NewsCardSkeleton } from '../components/ui/Skeleton'
+import { Badge } from '../components/ui/Badge'
 import { useWsContext } from '../layouts/MainLayout'
+import { categoryColor, timeAgo } from '../utils/formatters'
+
+function FeaturedCard({ item }) {
+  const isExternal = item.is_external === true
+  const inner = (
+    <div className="glass p-6 md:p-8 group hover:bg-white/8 transition-all duration-200 animate-fade-in border border-violet-500/20">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <span className="px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-widest bg-violet-500/20 text-violet-300 border border-violet-500/30">
+          Featured
+        </span>
+        {item.category && (
+          <Badge className={`border ${categoryColor(item.category)}`}>{item.category}</Badge>
+        )}
+        {isExternal && (
+          <Badge className="border border-amber-500/30 bg-amber-500/10 text-amber-300">External</Badge>
+        )}
+        <span className="text-white/40 text-xs ml-auto">{item.created_at ? timeAgo(item.created_at) : ''}</span>
+      </div>
+
+      <h2 className="text-xl md:text-2xl font-bold text-white leading-snug group-hover:text-violet-300 transition-colors mb-3">
+        {item.title}
+      </h2>
+
+      {item.description && (
+        <p className="text-white/55 text-sm leading-relaxed line-clamp-3 mb-4">{item.description}</p>
+      )}
+
+      {(item.image || item.image_url) && (
+        <img
+          src={isExternal ? (item.image_url ?? item.image) : `/media/${item.image}`}
+          alt={item.title}
+          className="w-full h-56 object-cover rounded-xl opacity-80 mb-4"
+          onError={(e) => { e.target.style.display = 'none' }}
+        />
+      )}
+
+      <div className="flex items-center gap-3 text-xs text-white/40">
+        {item.author_username && <span>by {item.author_username}</span>}
+        {isExternal && item.source && <span className="uppercase tracking-wide font-medium text-amber-400/70">{item.source}</span>}
+        {!isExternal && <span>♥ {item.likes_count ?? 0} · 💬 {item.comments_count ?? 0} · 👁 {item.views_count ?? 0}</span>}
+        {isExternal && <span className="ml-auto text-amber-400/70 font-medium">Read full article →</span>}
+      </div>
+    </div>
+  )
+
+  if (isExternal) return <a href={item.url} target="_blank" rel="noopener noreferrer">{inner}</a>
+  return <Link to={`/news/${item.id}`}>{inner}</Link>
+}
 
 const CATEGORIES = ['All', 'Technology', 'Sports', 'Politics', 'Entertainment', 'General']
 const SOURCES = [
@@ -75,6 +125,7 @@ export default function HomePage() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const allItems = data?.pages.flatMap((p) => p.results ?? []) ?? []
+  const showFeatured = category === 'All' && source === 'all' && !debouncedSearch && allItems.length > 0
 
   return (
     <div className="flex gap-6">
@@ -148,7 +199,8 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            {allItems.map((item, i) => (
+            {showFeatured && <FeaturedCard item={allItems[0]} />}
+            {allItems.slice(showFeatured ? 1 : 0).map((item, i) => (
               <NewsCard key={item.id ?? `ext-${i}`} item={item} queryKey={['news', category, source, debouncedSearch]} />
             ))}
             {/* Infinite scroll sentinel */}

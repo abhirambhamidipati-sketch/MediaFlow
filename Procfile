@@ -1,1 +1,1 @@
-web: gunicorn mediaflow.wsgi
+web: daphne -b 0.0.0.0 -p $PORT mediaflow.asgi:application

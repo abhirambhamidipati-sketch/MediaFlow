@@ -6,6 +6,8 @@ const MAX_RECONNECTS = 10
 
 export function useWebSocket(onMessage) {
   const [connected, setConnected] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const wsRef = useRef(null)
   const reconnectCount = useRef(0)
   const reconnectTimer = useRef(null)
@@ -15,11 +17,17 @@ export function useWebSocket(onMessage) {
   const connect = useCallback(() => {
     if (!localStorage.getItem('access')) return
 
+    setConnecting(true)
+    setRetrying(false)
+
     const ws = new WebSocket(WS_URL)
     wsRef.current = ws
 
     ws.onopen = () => {
+      console.log('[MF WS] connected to', WS_URL)
       setConnected(true)
+      setConnecting(false)
+      setRetrying(false)
       reconnectCount.current = 0
     }
 
@@ -30,15 +38,23 @@ export function useWebSocket(onMessage) {
       } catch { /* ignore malformed frames */ }
     }
 
-    ws.onclose = () => {
+    ws.onclose = (evt) => {
+      console.warn('[MF WS] closed — code:', evt.code, 'reason:', evt.reason || '(none)')
       setConnected(false)
+      setConnecting(false)
       if (reconnectCount.current < MAX_RECONNECTS) {
         reconnectCount.current++
+        setRetrying(true)
         reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY)
+      } else {
+        setRetrying(false)
       }
     }
 
-    ws.onerror = () => ws.close()
+    ws.onerror = (e) => {
+      console.error('[MF WS] error', e)
+      ws.close()
+    }
   }, [])
 
   useEffect(() => {
@@ -49,5 +65,5 @@ export function useWebSocket(onMessage) {
     }
   }, [connect])
 
-  return { connected }
+  return { connected, connecting, retrying }
 }

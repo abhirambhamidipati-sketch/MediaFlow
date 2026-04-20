@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .oauth_views import GoogleOAuthView
 from .views import (
     ApplicationListView,
     ApplicationReviewView,
@@ -39,6 +40,7 @@ urlpatterns = [
 
     # --- User registration & profile ---
     path('users/register/', UserRegisterView.as_view(), name='user-register'),
+    path('users/auth/google/', GoogleOAuthView.as_view(), name='user-google-oauth'),
     path('users/me/', UserMeView.as_view(), name='user-me'),
     path('users/me/bookmarks/', UserBookmarksView.as_view(), name='user-bookmarks'),
 
