@@ -33,7 +33,7 @@ export function MainLayout() {
 
   return (
     <WsContext.Provider value={{ connected, connecting, retrying, lastEvent }}>
-      <div className="min-h-screen bg-[#0B0B0F]">
+      <div className="min-h-screen" style={{ backgroundColor: '#09090f' }}>
 
         {/* Left sidebar — fixed, desktop always visible, mobile toggle */}
         <Sidebar

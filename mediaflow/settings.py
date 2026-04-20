@@ -54,6 +54,7 @@ ASGI_APPLICATION = "mediaflow.asgi.application"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -127,10 +128,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+# Where collectstatic writes files; served by WhiteNoise in production
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# WhiteNoise: compress + fingerprint static files for long-lived cache headers.
+# Uses the Django 4.2+ STORAGES dict (avoids STATICFILES_STORAGE deprecation warning).
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -183,13 +198,20 @@ CACHES = {
 }
 
 # --- Security Hardening ---
-# X-Content-Type-Options header: prevents browsers from MIME-sniffing the response
 SECURE_CONTENT_TYPE_NOSNIFF = True
-# Prevent site from being framed (clickjacking protection)
 X_FRAME_OPTIONS = 'DENY'
-# Set to True in production when HTTPS is enforced
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SECURE = False
+
+# These are safe to enable in production (Azure uses HTTPS).
+# Kept False in dev (DEBUG=True) so http://localhost works without SSL errors.
+_PROD = not DEBUG
+CSRF_COOKIE_SECURE    = _PROD
+SESSION_COOKIE_SECURE = _PROD
+SECURE_SSL_REDIRECT   = _PROD   # Redirect HTTP → HTTPS on Azure
+
+# HSTS: tell browsers to only use HTTPS for 1 year (only when SSL redirect is on)
+SECURE_HSTS_SECONDS        = 31536000 if _PROD else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _PROD
+SECURE_HSTS_PRELOAD            = _PROD
 
 # --- Logging ---
 LOGGING = {

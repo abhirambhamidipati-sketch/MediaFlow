@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { GoogleLoginButton } from '../components/GoogleLoginButton'
 import { extractError } from '../utils/formatters'
+import logoSrc from '../assets/logo.svg'
 
 function CheckIcon() {
   return (
@@ -41,66 +42,68 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0B0F] flex">
+    <div className="min-h-screen bg-[#09090f] flex">
 
       {/* ── Left branding panel ─────────────────────────────── */}
-      <div className="hidden lg:flex flex-col justify-between w-[480px] shrink-0 px-14 py-12 bg-[#0a0a12] border-r border-white/[0.06] relative overflow-hidden">
-        {/* Decorative orbs */}
-        <div className="absolute -top-32 -left-32 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-700/6 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-indigo-500/8 rounded-full blur-2xl pointer-events-none" />
+      <div className="hidden lg:flex flex-col justify-between w-[480px] shrink-0 px-14 py-12 relative overflow-hidden"
+           style={{ background: 'linear-gradient(145deg, #0a0a14 0%, #0d0d1a 100%)' }}>
+        {/* Border right */}
+        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/[0.07] to-transparent" />
+
+        {/* Ambient glows */}
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-600/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/3 w-48 h-48 bg-blue-400/5 rounded-full blur-2xl pointer-events-none" />
 
         {/* Logo */}
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="w-9 h-9 rounded-xl bg-blue-500 flex items-center justify-center font-bold text-white text-sm">
-            M
-          </div>
-          <span className="font-semibold text-white text-lg tracking-tight">MediaFlow</span>
+        <div className="relative z-10">
+          <img src={logoSrc} alt="MediaFlow" className="h-[30px] w-auto" />
         </div>
 
         {/* Hero copy */}
-        <div className="relative z-10 space-y-6">
+        <div className="relative z-10 space-y-7">
           <div>
-            <h1 className="text-[38px] font-bold text-white leading-[1.15] tracking-tight mb-4">
+            <h1 className="text-[40px] font-bold text-white leading-[1.12] tracking-tight mb-4">
               Your real-time<br />news platform.
             </h1>
-            <p className="text-white/45 text-[15px] leading-relaxed">
+            <p className="text-white/40 text-[15px] leading-relaxed">
               Stay ahead with live updates, intelligent aggregation, and community-driven content — all in one place.
             </p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {FEATURES.map((f) => (
               <div key={f} className="flex items-center gap-3">
-                <div className="w-[22px] h-[22px] rounded-full bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0">
+                <div className="w-[22px] h-[22px] rounded-full bg-blue-500/12 border border-blue-500/22 flex items-center justify-center text-blue-400 shrink-0">
                   <CheckIcon />
                 </div>
-                <span className="text-white/55 text-sm">{f}</span>
+                <span className="text-white/50 text-sm">{f}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-white/20 text-xs relative z-10">© 2025 MediaFlow. All rights reserved.</p>
+        <p className="text-white/18 text-xs relative z-10">© 2025 MediaFlow. All rights reserved.</p>
       </div>
 
       {/* ── Right form panel ─────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-[380px] animate-fade-in">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 relative overflow-hidden">
+        {/* Subtle ambient behind form */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[400px] bg-blue-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-full max-w-[380px] animate-scale-fade relative z-10">
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2.5 mb-10 justify-center">
-            <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center font-bold text-white text-sm">M</div>
-            <span className="font-semibold text-white text-[17px] tracking-tight">MediaFlow</span>
+          <div className="lg:hidden flex items-center justify-center mb-10">
+            <img src={logoSrc} alt="MediaFlow" className="h-[28px] w-auto" />
           </div>
 
           <h2 className="text-[26px] font-bold text-white mb-1 tracking-tight">Welcome back</h2>
-          <p className="text-white/40 text-sm mb-8">Sign in to continue to MediaFlow</p>
+          <p className="text-white/35 text-sm mb-8">Sign in to continue to MediaFlow</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-white/55 text-[13px] font-medium mb-1.5">Username</label>
+              <label className="block text-white/50 text-[13px] font-medium mb-1.5">Username</label>
               <input
                 className="input-field"
                 placeholder="Enter your username"
@@ -111,7 +114,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-white/55 text-[13px] font-medium mb-1.5">Password</label>
+              <label className="block text-white/50 text-[13px] font-medium mb-1.5">Password</label>
               <input
                 type="password"
                 className="input-field"
@@ -124,7 +127,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="text-red-400 text-sm bg-red-500/8 border border-red-500/20 rounded-xl px-4 py-3 animate-fade-in">
+              <div className="text-red-400/90 text-sm bg-red-500/6 border border-red-500/18 rounded-xl px-4 py-3 animate-fade-in-fast">
                 {error}
               </div>
             )}
@@ -132,7 +135,7 @@ export default function LoginPage() {
             <button type="submit" className="btn-primary w-full py-2.5 mt-1" disabled={loading}>
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-white/25 border-t-white rounded-full animate-spin" />
                   Signing in…
                 </span>
               ) : 'Sign in'}
@@ -140,10 +143,10 @@ export default function LoginPage() {
           </form>
 
           {/* Divider */}
-          <div className="relative flex items-center my-5">
-            <div className="flex-1 h-px bg-white/[0.07]" />
-            <span className="px-3 text-white/25 text-xs">or continue with</span>
-            <div className="flex-1 h-px bg-white/[0.07]" />
+          <div className="relative flex items-center my-6">
+            <div className="flex-1 h-px bg-white/[0.06]" />
+            <span className="px-3 text-white/22 text-xs">or continue with</span>
+            <div className="flex-1 h-px bg-white/[0.06]" />
           </div>
 
           <GoogleLoginButton
@@ -162,7 +165,7 @@ export default function LoginPage() {
             onError={(msg) => setError(msg || 'Google sign-in failed')}
           />
 
-          <p className="text-center text-white/35 text-sm mt-7">
+          <p className="text-center text-white/30 text-sm mt-7">
             Don&apos;t have an account?{' '}
             <Link to="/register" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
               Sign up free

@@ -54,26 +54,22 @@ export function NewsCard({ item, queryKey }) {
   const { user } = useAuth()
   const qc = useQueryClient()
 
-  const [liked,     setLiked]     = useState(item.is_liked ?? false)
-  const [likesCount,setLikesCount]= useState(item.likes_count ?? 0)
-  const [bookmarked,setBookmarked]= useState(item.is_bookmarked ?? false)
+  const [liked,      setLiked]      = useState(item.is_liked ?? false)
+  const [likesCount, setLikesCount] = useState(item.likes_count ?? 0)
+  const [bookmarked, setBookmarked] = useState(item.is_bookmarked ?? false)
 
   const likeMutation = useMutation({
     mutationFn: () => api.post(`/news/${item.id}/like/`),
-    onMutate: () => {
-      const was = liked
-      setLiked(!was)
-      setLikesCount((c) => was ? c - 1 : c + 1)
-    },
+    onMutate:  () => { const was = liked; setLiked(!was); setLikesCount((c) => was ? c - 1 : c + 1) },
     onSuccess: (res) => { setLiked(res.data.liked); setLikesCount(res.data.likes_count) },
-    onError: ()  => { setLiked(liked); setLikesCount(item.likes_count) },
+    onError:   ()    => { setLiked(liked); setLikesCount(item.likes_count) },
   })
 
   const bookmarkMutation = useMutation({
     mutationFn: () => api.post(`/news/${item.id}/bookmark/`),
-    onMutate: () => setBookmarked((b) => !b),
+    onMutate:  () => setBookmarked((b) => !b),
     onSuccess: (res) => setBookmarked(res.data.bookmarked),
-    onError: ()  => setBookmarked(item.is_bookmarked),
+    onError:   ()    => setBookmarked(item.is_bookmarked),
   })
 
   const isExternal = item.is_external === true
@@ -81,16 +77,18 @@ export function NewsCard({ item, queryKey }) {
   const imgSrc     = isExternal ? (item.image_url ?? item.image) : (item.image ? `/media/${item.image}` : null)
 
   const inner = (
-    <article className="card group cursor-pointer animate-fade-in overflow-hidden">
-      {/* Cover image */}
+    <article className="card group cursor-pointer overflow-hidden">
+      {/* Cover image with overlay on hover */}
       {hasImage && imgSrc && (
-        <div className="w-full aspect-[16/7] overflow-hidden bg-white/[0.03]">
+        <div className="w-full aspect-[16/7] overflow-hidden bg-white/[0.025] relative">
           <img
             src={imgSrc}
             alt={item.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             onError={(e) => { e.target.parentElement.style.display = 'none' }}
           />
+          {/* Subtle overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
       )}
 
@@ -112,50 +110,44 @@ export function NewsCard({ item, queryKey }) {
               MediaFlow
             </Badge>
           )}
-          <span className="text-white/30 text-xs ml-auto shrink-0">
+          <span className="text-white/25 text-xs ml-auto shrink-0">
             {item.created_at ? timeAgo(item.created_at) : ''}
           </span>
         </div>
 
         {/* Title */}
-        <h2 className="text-white/90 font-semibold text-[15px] leading-[1.45] mb-2 line-clamp-2
+        <h2 className="text-white/88 font-semibold text-[15px] leading-[1.45] mb-2 line-clamp-2
                        group-hover:text-blue-300 transition-colors duration-200">
           {item.title}
         </h2>
 
         {/* Description */}
         {item.description && (
-          <p className="text-white/40 text-sm leading-relaxed line-clamp-2 mb-4">
+          <p className="text-white/38 text-sm leading-relaxed line-clamp-2 mb-4">
             {item.description}
           </p>
         )}
 
         {/* Footer */}
-        <div className="flex items-center gap-1 pt-3 border-t border-white/[0.05]">
-          {/* Author */}
+        <div className="flex items-center gap-1 pt-3 border-t border-white/[0.04]">
           {item.author_username && !isExternal && (
-            <span className="text-xs text-white/30 mr-auto">
-              {item.author_username}
-            </span>
+            <span className="text-xs text-white/28 mr-auto">{item.author_username}</span>
           )}
 
-          {/* External CTA */}
           {isExternal && (
-            <span className="flex items-center gap-1.5 text-xs text-amber-400/70 font-medium mr-auto hover:text-amber-400 transition-colors">
+            <span className="flex items-center gap-1.5 text-xs text-amber-400/65 font-medium mr-auto hover:text-amber-400 transition-colors">
               Read article <IconArrow />
             </span>
           )}
 
-          {/* Internal actions */}
           {!isExternal && user && (
             <div className="flex items-center gap-0.5 ml-auto">
-              {/* Like */}
               <button
                 className={[
                   'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
                   liked
                     ? 'text-rose-400 bg-rose-500/10'
-                    : 'text-white/35 hover:text-rose-400 hover:bg-rose-500/8',
+                    : 'text-white/30 hover:text-rose-400 hover:bg-rose-500/8',
                 ].join(' ')}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); likeMutation.mutate() }}
                 disabled={likeMutation.isPending}
@@ -164,19 +156,17 @@ export function NewsCard({ item, queryKey }) {
                 <span>{likesCount}</span>
               </button>
 
-              {/* Comment count */}
-              <span className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/30">
+              <span className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/25">
                 <IconComment />
                 <span>{item.comments_count ?? 0}</span>
               </span>
 
-              {/* Bookmark */}
               <button
                 className={[
                   'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-150',
                   bookmarked
                     ? 'text-blue-400 bg-blue-500/10'
-                    : 'text-white/35 hover:text-blue-400 hover:bg-blue-500/8',
+                    : 'text-white/28 hover:text-blue-400 hover:bg-blue-500/8',
                 ].join(' ')}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); bookmarkMutation.mutate() }}
                 disabled={bookmarkMutation.isPending}
@@ -184,8 +174,7 @@ export function NewsCard({ item, queryKey }) {
                 <IconBookmark filled={bookmarked} />
               </button>
 
-              {/* Views */}
-              <span className="flex items-center gap-1 px-2 text-xs text-white/25">
+              <span className="flex items-center gap-1 px-2 text-xs text-white/22">
                 <IconEye />
                 <span>{item.views_count ?? 0}</span>
               </span>
@@ -198,11 +187,11 @@ export function NewsCard({ item, queryKey }) {
 
   if (isExternal) {
     return (
-      <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
+      <a href={item.url} target="_blank" rel="noopener noreferrer" className="block feed-item">
         {inner}
       </a>
     )
   }
 
-  return <Link to={`/news/${item.id}`} className="block">{inner}</Link>
+  return <Link to={`/news/${item.id}`} className="block feed-item">{inner}</Link>
 }

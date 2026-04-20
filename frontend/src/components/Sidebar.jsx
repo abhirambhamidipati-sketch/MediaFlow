@@ -2,6 +2,7 @@ import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { roleColor } from '../utils/formatters'
 import { useWsContext } from '../layouts/MainLayout'
+import logoSrc from '../assets/logo.svg'
 
 /* ── Inline SVG icons (Heroicons outline style) ──────────────────── */
 function IconHome() {
@@ -144,18 +145,15 @@ export function Sidebar({ mobileOpen, onClose }) {
       <aside
         className={[
           'fixed inset-y-0 left-0 z-40 w-[232px] flex flex-col',
-          'bg-[#0e0e16] border-r border-white/[0.06]',
+          'bg-[#0a0a12] border-r border-white/[0.055]',
           'transition-transform duration-300 ease-in-out',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
       >
         {/* Logo */}
-        <div className="h-[60px] flex items-center px-5 border-b border-white/[0.06] shrink-0">
-          <Link to="/" className="flex items-center gap-2.5 group" onClick={onClose}>
-            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
-              M
-            </div>
-            <span className="font-semibold text-white text-[15px] tracking-tight">MediaFlow</span>
+        <div className="h-[60px] flex items-center px-5 border-b border-white/[0.05] shrink-0">
+          <Link to="/" className="logo-link flex items-center" onClick={onClose}>
+            <img src={logoSrc} alt="MediaFlow" className="h-[28px] w-auto transition-all duration-250" />
           </Link>
         </div>
 

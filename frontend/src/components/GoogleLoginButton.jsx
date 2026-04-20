@@ -25,11 +25,11 @@ function GoogleSvg({ dim = false }) {
 
 const NOT_DISPLAYED_MSGS = {
   invalid_client:
-    'Google Sign-In is blocked for this domain. In Google Cloud Console → Credentials → your OAuth client → add http://localhost:5174 to Authorized JavaScript origins.',
+    'Google Sign-In is blocked for this domain. In Google Cloud Console → Credentials → your OAuth client → add http://localhost:5173 to Authorized JavaScript origins.',
   unregistered_origin:
-    'This origin is not registered with your Google OAuth client. In Google Cloud Console → Credentials → your OAuth client → add http://localhost:5174 to Authorized JavaScript origins.',
+    'This origin is not registered with your Google OAuth client. In Google Cloud Console → Credentials → your OAuth client → add http://localhost:5173 to Authorized JavaScript origins.',
   origin_mismatch:
-    'Origin mismatch: your Google OAuth client does not allow http://localhost:5174. Add it in Google Cloud Console → Credentials → your OAuth client → Authorized JavaScript origins.',
+    'Origin mismatch: your Google OAuth client does not allow http://localhost:5173. Add it in Google Cloud Console → Credentials → your OAuth client → Authorized JavaScript origins.',
   missing_client_id: 'Google client ID is missing. Set VITE_GOOGLE_CLIENT_ID.',
   suppressed_by_user:
     'Google Sign-In was dismissed by the browser. Try clearing site cookies, or disable "Block third-party cookies" for localhost.',
@@ -136,8 +136,8 @@ export function GoogleLoginButton({ onSuccess, onError }) {
       disabled={isLoading}
       className={`w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200
         ${isLoading
-          ? 'border-white/10 bg-white/5 text-white/30 cursor-wait'
-          : 'border-white/20 bg-white text-gray-800 hover:bg-gray-100 active:bg-gray-200 cursor-pointer'
+          ? 'border-white/8 bg-white/4 text-white/25 cursor-wait'
+          : 'border-white/18 bg-white text-gray-800 hover:bg-gray-50 hover:border-white/30 active:scale-[0.98] active:bg-gray-100 cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.4)]'
         }`}
     >
       {isLoading
