@@ -201,15 +201,24 @@ CACHES = {
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# These are safe to enable in production (Azure uses HTTPS).
-# Kept False in dev (DEBUG=True) so http://localhost works without SSL errors.
 _PROD = not DEBUG
+
+# Cookie security flags — safe to enable when DEBUG=False.
+# These only control the Secure attribute on cookies; they do not redirect.
 CSRF_COOKIE_SECURE    = _PROD
 SESSION_COOKIE_SECURE = _PROD
-SECURE_SSL_REDIRECT   = _PROD   # Redirect HTTP → HTTPS on Azure
 
-# HSTS: tell browsers to only use HTTPS for 1 year (only when SSL redirect is on)
-SECURE_HSTS_SECONDS        = 31536000 if _PROD else 0
+# SECURE_SSL_REDIRECT must stay False in Django.
+# Azure App Service terminates TLS at the load balancer and issues its own
+# HTTP→HTTPS redirect before traffic reaches the Django process. If Django
+# also redirects, the test client (and local runserver) receives 301 on every
+# plain-HTTP request, breaking the entire test suite.
+# To enforce HTTPS on Azure: enable "HTTPS Only" in the App Service settings.
+SECURE_SSL_REDIRECT = False
+
+# HSTS: add the Strict-Transport-Security header so browsers remember to
+# use HTTPS directly. This is a response header only — it never redirects.
+SECURE_HSTS_SECONDS            = 31536000 if _PROD else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = _PROD
 SECURE_HSTS_PRELOAD            = _PROD
 
