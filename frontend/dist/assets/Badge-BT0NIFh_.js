@@ -1,0 +1,1 @@
+import{o as e}from"./formatters-38ChXjiR.js";var t=e();function n({children:e,className:n=``}){return(0,t.jsx)(`span`,{className:`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${n}`,children:e})}export{n as t};
