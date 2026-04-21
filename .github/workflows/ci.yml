@@ -9,7 +9,6 @@ on:
 jobs:
   build-and-secure:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -30,27 +29,36 @@ jobs:
       run: |
         python manage.py makemigrations
         python manage.py migrate
-
+    
     - name: Run tests
       env:
         SECRET_KEY: ${{ secrets.SECRET_KEY }}
       run: |
         python manage.py test
-
+    
     # 🔐 DevSecOps
-
+    
     - name: Install security tools
       run: |
         pip install bandit safety flake8
-
+    
     - name: Run Bandit (SAST)
       run: |
         bandit -r . -x ./venv || true
-
+    
     - name: Run Safety Check
       run: |
         safety check --full-report || true
-
+    
     - name: Run Flake8
       run: |
         flake8 . || true
+    
+    # 🚀 Azure Deployment (ONLY runs on main branch)
+    
+    - name: Deploy to Azure Web App
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: mediaflow-backend-abhiram
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
