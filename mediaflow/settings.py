@@ -31,12 +31,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret-key')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 
-raw_hosts = os.getenv("ALLOWED_HOSTS")
-
-if raw_hosts:
-    ALLOWED_HOSTS = raw_hosts.split(",")
-else:
-    ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
