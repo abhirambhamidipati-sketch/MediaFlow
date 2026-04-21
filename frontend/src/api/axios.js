@@ -1,7 +1,13 @@
 import axios from 'axios'
 
+// When VITE_API_BASE_URL is set (dev → Azure, or production build), all requests
+// go directly to that origin.  When it is absent the baseURL is the bare path
+// '/api' and Vite's dev-proxy forwards requests to localhost:8000 — exactly the
+// original local-only behaviour, so nothing breaks for pure-local development.
+const _origin = import.meta.env.VITE_API_BASE_URL ?? ''
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: `${_origin}/api`,
   headers: { 'Content-Type': 'application/json' },
 })
 

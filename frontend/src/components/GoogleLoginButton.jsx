@@ -23,19 +23,23 @@ function GoogleSvg({ dim = false }) {
   )
 }
 
-const NOT_DISPLAYED_MSGS = {
-  invalid_client:
-    'Google Sign-In is blocked for this domain. In Google Cloud Console → Credentials → your OAuth client → add http://localhost:5173 to Authorized JavaScript origins.',
-  unregistered_origin:
-    'This origin is not registered with your Google OAuth client. In Google Cloud Console → Credentials → your OAuth client → add http://localhost:5173 to Authorized JavaScript origins.',
-  origin_mismatch:
-    'Origin mismatch: your Google OAuth client does not allow http://localhost:5173. Add it in Google Cloud Console → Credentials → your OAuth client → Authorized JavaScript origins.',
-  missing_client_id: 'Google client ID is missing. Set VITE_GOOGLE_CLIENT_ID.',
-  suppressed_by_user:
-    'Google Sign-In was dismissed by the browser. Try clearing site cookies, or disable "Block third-party cookies" for localhost.',
-  opt_out_or_no_session:
-    'No Google account session found. Sign into Google in another tab first, then try again.',
-  browser_not_supported: 'Your browser does not support Google Sign-In.',
+function getNotDisplayedMsg(reason) {
+  const origin = window.location.origin
+  const msgs = {
+    invalid_client:
+      `Google Sign-In is blocked for this domain. In Google Cloud Console → Credentials → your OAuth client → add ${origin} to Authorized JavaScript origins.`,
+    unregistered_origin:
+      `This origin is not registered with your Google OAuth client. In Google Cloud Console → Credentials → your OAuth client → add ${origin} to Authorized JavaScript origins.`,
+    origin_mismatch:
+      `Origin mismatch: your Google OAuth client does not allow ${origin}. Add it in Google Cloud Console → Credentials → your OAuth client → Authorized JavaScript origins.`,
+    missing_client_id: 'Google client ID is missing. Set VITE_GOOGLE_CLIENT_ID.',
+    suppressed_by_user:
+      'Google Sign-In was dismissed by the browser. Try clearing site cookies, or disable "Block third-party cookies" for this site.',
+    opt_out_or_no_session:
+      'No Google account session found. Sign into Google in another tab first, then try again.',
+    browser_not_supported: 'Your browser does not support Google Sign-In.',
+  }
+  return msgs[reason] ?? `Google Sign-In could not be shown (${reason}). Please try again.`
 }
 
 export function GoogleLoginButton({ onSuccess, onError }) {
@@ -60,9 +64,6 @@ export function GoogleLoginButton({ onSuccess, onError }) {
 
       if (window.google?.accounts?.id) {
         if (!_gsiInitialized && !cancelled) {
-          console.log('[MF DEBUG] google.accounts available:', true)
-          console.log('[MF DEBUG] initializing Google with client_id:', CLIENT_ID)
-          console.log('[MF DEBUG] current origin:', window.location.origin)
           window.google.accounts.id.initialize({
             client_id: CLIENT_ID,
             callback: ({ credential }) => {
@@ -72,7 +73,6 @@ export function GoogleLoginButton({ onSuccess, onError }) {
             cancel_on_tap_outside: true,
           })
           _gsiInitialized = true
-          console.log('[MF FIX] Google initialized once')
         }
         if (!cancelled) setSdkState('ready')
       } else if (attempts < 50) {
@@ -95,10 +95,7 @@ export function GoogleLoginButton({ onSuccess, onError }) {
 
     window.google.accounts.id.prompt((notification) => {
       if (notification.isNotDisplayed()) {
-        const reason  = notification.getNotDisplayedReason()
-        const message = NOT_DISPLAYED_MSGS[reason]
-          ?? `Google Sign-In could not be shown (${reason}). Please try again.`
-        onErrorRef.current?.(message)
+        onErrorRef.current?.(getNotDisplayedMsg(notification.getNotDisplayedReason()))
       }
       // isSkippedMoment / isDismissedMoment = user actively closed it; no error needed
     })

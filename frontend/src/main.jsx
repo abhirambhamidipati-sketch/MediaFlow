@@ -6,10 +6,6 @@ import { AuthProvider } from './context/AuthContext'
 import './index.css'
 import App from './App.jsx'
 
-// [MF DEBUG] — remove before production
-console.log('[MF DEBUG] origin:', window.location.origin)
-console.log('[MF DEBUG] VITE_GOOGLE_CLIENT_ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID)
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

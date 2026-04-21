@@ -1,18 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/news/`
+// Derive the WebSocket endpoint from the same env variable used by axios so
+// there is exactly one place to change the backend target.
+//
+// When VITE_API_BASE_URL is set:
+//   https://example.com  →  wss://example.com/ws/news/
+//   http://example.com   →  ws://example.com/ws/news/
+//
+// When VITE_API_BASE_URL is absent (pure local dev):
+//   falls back to the current browser origin → Vite proxy handles /ws/*
+function buildWsUrl() {
+  const apiBase = import.meta.env.VITE_API_BASE_URL
+  if (apiBase) {
+    return apiBase.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + '/ws/news/'
+  }
+  // Dev without env var: let Vite proxy upgrade and forward to localhost:8000
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/news/`
+}
+
+const WS_URL = buildWsUrl()
 const RECONNECT_DELAY = 3000
-const MAX_RECONNECTS = 10
+const MAX_RECONNECTS  = 10
 
 export function useWebSocket(onMessage) {
-  const [connected, setConnected] = useState(false)
+  const [connected,  setConnected]  = useState(false)
   const [connecting, setConnecting] = useState(false)
-  const [retrying, setRetrying] = useState(false)
-  const wsRef = useRef(null)
-  const reconnectCount = useRef(0)
-  const reconnectTimer = useRef(null)
-  const onMessageRef = useRef(onMessage)
-  onMessageRef.current = onMessage
+  const [retrying,   setRetrying]   = useState(false)
+  const wsRef           = useRef(null)
+  const reconnectCount  = useRef(0)
+  const reconnectTimer  = useRef(null)
+  const onMessageRef    = useRef(onMessage)
+  onMessageRef.current  = onMessage
 
   const connect = useCallback(() => {
     if (!localStorage.getItem('access')) return

@@ -44,12 +44,14 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'django_filters',
     'channels',
+    'corsheaders',
     'news',
 ]
 
 ASGI_APPLICATION = "mediaflow.asgi.application"
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -218,6 +220,27 @@ SECURE_SSL_REDIRECT = False
 SECURE_HSTS_SECONDS            = 31536000 if _PROD else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = _PROD
 SECURE_HSTS_PRELOAD            = _PROD
+
+# --- CORS ---
+# Allow the local Vite dev-server and any Vercel deployment to call the API.
+# CORS_ALLOW_CREDENTIALS lets browsers send the Authorization header
+# (required for JWT).  django-cors-headers reflects the exact request Origin
+# instead of '*' when credentials are enabled, which satisfies the browser's
+# CORS rules while still being explicit about which origins are permitted.
+#
+# To add the production Vercel URL without redeploying: set the FRONTEND_URL
+# environment variable in Azure App Service → Configuration → App settings.
+_frontend_url = os.getenv('FRONTEND_URL', '').strip()
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = list(filter(None, [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    _frontend_url,
+]))
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://[\w.-]+\.vercel\.app$',  # any Vercel preview or production URL
+]
 
 # --- Logging ---
 LOGGING = {
