@@ -1,4 +1,4 @@
-name: Django CI/CD (Final Stable)
+name: Django CI/CD
 
 on:
   push:
