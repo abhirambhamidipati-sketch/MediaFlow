@@ -21,6 +21,9 @@ import os
 
 # SECURITY WARNING: keep the secret key used in production secret!
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://mediaflow-backend-abhiram-hfa8h6auhjg5fybr.centralindia-01.azurewebsites.net",
+]
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret-key')
 
