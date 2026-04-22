@@ -324,15 +324,21 @@ chore: requirements.txt rewritten as UTF-8 (was UTF-16 LE, pip silently failed)
 
 ![CI/CD Pipeline Success]
 
+<img width="2843" height="1559" alt="image" src="https://github.com/user-attachments/assets/973a5559-b627-484f-add9-f6b062dcbd9e" />
+
 
 ### Azure App Service — Deployment Output
 
 ![Azure Deployment Output])
 
+<img width="2863" height="1552" alt="image" src="https://github.com/user-attachments/assets/9c62dc4d-5f57-47ce-81de-f8291e8f354d" />
+
 
 ### Vercel — Frontend Deployment
 
 ![Vercel Deployment]
+
+<img width="2855" height="1571" alt="image" src="https://github.com/user-attachments/assets/60801367-b78d-41be-a2d9-474df64cedae" />
 
 
 ---
