@@ -40,41 +40,41 @@ The engineering challenge was not just building the features, but wiring togethe
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              USER'S BROWSER                                  │
-│                                                                               │
-│   ┌──────────────────────────────────────────────────────────────────────┐   │
-│   │                  React + Vite SPA (Vercel)                           │   │
-│   │                                                                      │   │
-│   │  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  ┌───────────┐  │   │
-│   │  │  LoginPage │  │  HomePage   │  │ NewsDetail   │  │ Dashboard │  │   │
-│   │  └────────────┘  └─────────────┘  └──────────────┘  └───────────┘  │   │
-│   │                                                                      │   │
-│   │  ┌───────────────────────┐   ┌──────────────────────────────────┐   │   │
-│   │  │  AuthContext (JWT)    │   │  TanStack Query (HTTP cache)     │   │   │
-│   │  └───────────────────────┘   └──────────────────────────────────┘   │   │
-│   │                                                                      │   │
-│   │  ┌──────────────────┐   ┌──────────────────────────────────────┐   │   │
-│   │  │  axios (REST API)│   │  useWebSocket hook (wss://)          │   │   │
-│   │  └──────────────────┘   └──────────────────────────────────────┘   │   │
-│   └──────────────────────────────────────────────────────────────────────┘   │
-│              │  HTTPS REST                        │  WSS WebSocket            │
-└──────────────┼────────────────────────────────────┼───────────────────────────┘
+│                              USER'S BROWSER                                 │
+│                                                                             │
+│   ┌──────────────────────────────────────────────────────────────────────┐  │
+│   │                  React + Vite SPA (Vercel)                           │  │
+│   │                                                                      │  │
+│   │  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  ┌───────────┐    |  │
+│   │  │  LoginPage │  │  HomePage   │  │ NewsDetail   │  │ Dashboard │    │  │
+│   │  └────────────┘  └─────────────┘  └──────────────┘  └───────────┘    │  │
+│   │                                                                      │  │
+│   │  ┌───────────────────────┐   ┌──────────────────────────────────┐    │  │
+│   │  │  AuthContext (JWT)    │   │  TanStack Query (HTTP cache)     │    │  │
+│   │  └───────────────────────┘   └──────────────────────────────────┘    │  │
+│   │                                                                      │  │
+│   │  ┌──────────────────┐   ┌──────────────────────────────────────┐     │  │
+│   │  │  axios (REST API)│   │  useWebSocket hook (wss://)          │     │  │
+│   │  └──────────────────┘   └──────────────────────────────────────┘     │  │
+│   └──────────────────────────────────────────────────────────────────────┘  │
+│              │  HTTPS REST                        │  WSS WebSocket          │
+└──────────────┼────────────────────────────────────┼─────────────────────────┘
                │                                    │
                ▼                                    ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│              Azure App Service  (Central India)                               │
-│                                                                               │
+│              Azure App Service  (Central India)                              │
+│                                                                              │
 │   ┌────────────────────────────────────────────────────────────────────────┐ │
 │   │             Daphne ASGI Server  (startup.sh)                           │ │
 │   │                                                                        │ │
-│   │  ┌──────────────────────────────┐  ┌────────────────────────────────┐ │ │
-│   │  │   Django HTTP Handler        │  │  Django Channels WebSocket     │ │ │
-│   │  │                              │  │  Consumer (/ws/news/)          │ │ │
-│   │  │  CorsMiddleware (first)      │  └────────────────────────────────┘ │ │
+│   │  ┌──────────────────────────────┐  ┌────────────────────────────────┐  │ │
+│   │  │   Django HTTP Handler        │  │  Django Channels WebSocket     │  │ │
+│   │  │                              │  │  Consumer (/ws/news/)          │  │ │
+│   │  │  CorsMiddleware (first)      │  └────────────────────────────────┘  │ │
 │   │  │  SecurityMiddleware          │                                      │ │
-│   │  │  WhiteNoiseMiddleware        │  ┌────────────────────────────────┐ │ │
-│   │  │  AuthMiddleware              │  │  InMemoryChannelLayer          │ │ │
-│   │  │                              │  └────────────────────────────────┘ │ │
+│   │  │  WhiteNoiseMiddleware        │  ┌────────────────────────────────┐  │ │
+│   │  │  AuthMiddleware              │  │  InMemoryChannelLayer          │  │ │
+│   │  │                              │  └────────────────────────────────┘  │ │
 │   │  │  ┌──────────────────────┐    │                                      │ │
 │   │  │  │  DRF REST API        │    │                                      │ │
 │   │  │  │  /api/news/          │    │                                      │ │
@@ -84,9 +84,9 @@ The engineering challenge was not just building the features, but wiring togethe
 │   │  │  └──────────────────────┘    │                                      │ │
 │   │  └──────────────────────────────┘                                      │ │
 │   │                                                                        │ │
-│   │  ┌──────────────────────────────────────────────────────────────────┐ │ │
-│   │  │  SQLite DB          WhiteNoise static      media/ uploads        │ │ │
-│   │  └──────────────────────────────────────────────────────────────────┘ │ │
+│   │  ┌──────────────────────────────────────────────────────────────────┐  │ │
+│   │  │  SQLite DB          WhiteNoise static      media/ uploads        │  │ │
+│   │  └──────────────────────────────────────────────────────────────────┘  │ │
 │   └────────────────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────────────┘
                ▲
@@ -203,7 +203,7 @@ The rationale for making these non-blocking is pragmatic: third-party packages f
 #### Step 8 — Static File Collection
 Runs `python manage.py collectstatic --noinput`. This step validates that WhiteNoise's `CompressedManifestStaticFilesStorage` can successfully compress and fingerprint all static assets. If any static file reference is broken (e.g. a missing image referenced in a template), this step will fail before deployment.
 
-#### Step 9 — Azure Deployment (Conditional)
+#### Step 9 — Azure Deployment 
 Uses `azure/webapps-deploy@v2` with two explicit conditions:
 1. `github.ref == 'refs/heads/develop'` — only deploy from the `develop` branch, not from pull request workflows
 2. `success()` — only deploy if all preceding steps (including the test gate) passed
@@ -322,21 +322,18 @@ chore: requirements.txt rewritten as UTF-8 (was UTF-16 LE, pip silently failed)
 
 ### CI/CD Pipeline — Successful Run
 
-![CI/CD Pipeline Success](docs/screenshots/cicd-pipeline-success.png)
+![CI/CD Pipeline Success]
 
-*GitHub Actions workflow showing all 9 steps passing: checkout, Python setup, dependency installation, environment configuration, database migrations, 75 test cases passing, Bandit SAST scan, Safety dependency scan, Flake8 linting, static file collection, and Azure deployment.*
 
 ### Azure App Service — Deployment Output
 
-![Azure Deployment Output](docs/screenshots/azure-deployment.png)
+![Azure Deployment Output])
 
-*Azure App Service deployment log showing `startup.sh` execution: pip install, collectstatic (154 files processed), database migrations applied, and Daphne ASGI server started on port 8000.*
 
 ### Vercel — Frontend Deployment
 
-![Vercel Deployment](docs/screenshots/vercel-deployment.png)
+![Vercel Deployment]
 
-*Vercel deployment dashboard showing the React/Vite build completing successfully (`node node_modules/vite/bin/vite.js build`), output directory `dist/` generated, and deployment promoted to production.*
 
 ---
 
